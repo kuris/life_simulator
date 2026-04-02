@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>CMS 관리자 — 대한민국 직장인 생존기</title>
+  <title>CMS 대시보드 — 대한민국 직장인 생존기</title>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet"/>
   <style>
     :root {
@@ -27,173 +27,74 @@
     h1 { font-family: 'Share Tech Mono', monospace; font-size: 28px; color: var(--primary); margin-bottom: 30px; letter-spacing: 2px; text-transform: uppercase; border-left: 5px solid var(--primary); padding-left: 15px; }
 
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 30px; margin-bottom: 30px; }
-    .card-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--secondary); display: flex; align-items: center; gap: 10px; }
+    .card-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; color: var(--secondary); display: flex; align-items: center; gap: 10px; }
 
-    .form-group { margin-bottom: 20px; }
-    label { display: block; font-size: 13px; color: var(--dim); margin-bottom: 8px; font-weight: 700; }
-    input, select, textarea {
-      width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-      padding: 12px; color: var(--text); font-family: inherit; font-size: 14px;
+    .btn-main {
+      display: inline-flex; align-items: center; gap: 12px;
+      background: var(--primary); color: var(--bg);
+      padding: 20px 40px; border-radius: 12px; font-size: 18px; font-weight: 700;
+      text-decoration: none; transition: .2s; box-shadow: 0 10px 30px rgba(0,255,136,.2);
+      margin-bottom: 10px;
     }
-    input:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 10px rgba(0,255,136,.1); }
+    .btn-main:hover { transform: translateY(-3px); box-shadow: 0 15px 40px rgba(0,255,136,.4); }
 
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .guide { margin-top: 40px; }
+    .guide h3 { color: var(--primary); font-size: 16px; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .step { margin-bottom: 25px; }
+    .step-num { display: inline-block; width: 24px; height: 24px; background: var(--secondary); color: var(--bg); border-radius: 50%; text-align: center; font-size: 14px; font-weight: 700; line-height: 24px; margin-right: 10px; }
+    .step-txt { font-size: 14px; color: var(--text); }
+    
+    code { background: #000; color: #0f0; padding: 2px 6px; border-radius: 4px; font-family: 'Share Tech Mono', monospace; font-size: 13px; }
 
-    .btn {
-      padding: 14px 28px; border-radius: 8px; border: none; font-size: 14px; font-weight: 700; cursor: pointer;
-      font-family: inherit; transition: .2s; margin-top: 10px;
-    }
-    .btn-primary { background: var(--primary); color: var(--bg); }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,255,136,.3); }
-    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-
-    .json-output {
-      background: #000; color: #0f0; padding: 20px; border-radius: 8px;
-      font-family: 'Share Tech Mono', monospace; font-size: 12px;
-      white-space: pre-wrap; overflow-x: auto; border: 1px solid #1a1a1a;
-      max-height: 400px;
-    }
-    .copy-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--primary); color: var(--bg); padding: 10px 20px; border-radius: 20px; font-weight: 700; display: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+    th { text-align: left; background: var(--surface2); color: var(--dim); padding: 12px; border: 1px solid var(--border); }
+    td { padding: 12px; border: 1px solid var(--border); color: var(--text); }
+    
+    .badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; background: var(--surface2); color: var(--secondary); }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h1>Scenarios / CMS Admin</h1>
+  <h1>Historical Scenario CMS</h1>
 
-  <div class="card">
-    <div class="card-title">📝 시나리오 기본 정보</div>
-    <div class="grid">
-      <div class="form-group">
-        <label>시나리오 ID (중복 주의)</label>
-        <input type="text" id="s-id" placeholder="imf_1997" oninput="updateJSON()"/>
-      </div>
-      <div class="form-group">
-        <label>날짜 (YYYY-MM-DD)</label>
-        <input type="date" id="s-date" oninput="updateJSON()"/>
-      </div>
-    </div>
-    <div class="grid">
-      <div class="form-group">
-        <label>시대 매칭 (Base Era)</label>
-        <select id="s-era" onchange="updateJSON()">
-           <option value="1980">1980년대</option>
-           <option value="1997">1997 IMF</option>
-           <option value="2000">2000년대 IT</option>
-           <option value="2010">2010년대</option>
-           <option value="2020">2020 코로나</option>
-           <option value="2026">2026 AI</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>제목 (이모지 포함 가능)</label>
-        <input type="text" id="s-title" placeholder="💥 국가 부도의 날" oninput="updateJSON()"/>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>시나리오 설명</label>
-      <textarea id="s-desc" rows="3" oninput="updateJSON()"></textarea>
-    </div>
+  <div class="card" style="text-align: center; padding: 60px 40px;">
+    <div class="card-title" style="justify-content: center; margin-bottom: 30px;">📊 콘텐츠 관리 스프레드시트</div>
+    <a href="https://docs.google.com/spreadsheets/d/1X1iQ9u_Aat_A6HqGId5b8J9S6b0qUx-y9C8Umsp-w0qUx/edit" target="_blank" class="btn-main">
+      🚀 구글 스프레드시트 열기
+    </a>
+    <div style="color: var(--dim); font-size: 13px; margin-top: 15px;">※ 시트에서 수정 후 게임을 새로고침하면 즉시 반영됩니다.</div>
   </div>
 
-  <div class="card">
-    <div class="card-title">🎬 역사적 사건 (Fixed Event)</div>
-    <div class="grid">
-      <div class="form-group">
-        <label>발생 시각 (HH:MM)</label>
-        <input type="time" id="e-time" value="14:00" oninput="updateJSON()"/>
-      </div>
-      <div class="form-group">
-        <label>사건 명칭</label>
-        <input type="text" id="e-title" placeholder="긴급 발표" oninput="updateJSON()"/>
-      </div>
+  <div class="guide card">
+    <h3>💡 데이터 입력 가이드 (Cheat Sheet)</h3>
+    
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-txt">새로운 행에 사건 정보를 입력합니다. <code>ID</code>는 중복되지 않게 작성해 주세요.</div>
     </div>
-    <div class="form-group">
-      <label>스토리 내용 (Enter로 구분)</label>
-      <textarea id="e-story" rows="4" placeholder="라디오에서 뉴스가 흘러나온다.
-경제가 무너지고 있다는 소식이다." oninput="updateJSON()"></textarea>
-    </div>
-    <div class="form-group">
-      <label>선택지 1 (내용 | 효과 | 결과)</label>
-      <input type="text" id="choice1" placeholder="은행에 들른다 | stress:10,money:-5000 | 불안감이 엄습한다." oninput="updateJSON()"/>
-    </div>
-    <div class="form-group">
-      <label>선택지 2 (내용 | 효과 | 결과)</label>
-      <input type="text" id="choice2" placeholder="그냥 출근한다 | stress:5 | 묵묵히 일했다." oninput="updateJSON()"/>
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="card-title">💾 생성된 JSON (Copy & Paste to scenarios.json)</div>
-    <div class="json-output" id="json-result">{}</div>
-    <button class="btn btn-primary" onclick="copyJSON()">📋 클립보드 복사</button>
-    <button class="btn btn-secondary" onclick="resetForm()">🔄 초기화</button>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-txt"><code>EventStory</code>는 여러 줄일 경우 <code>|</code> 기호로 구분합니다. (예: 첫째 줄|둘째 줄)</div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-txt"><code>Effect</code> 형식은 <code>스탯키:변화값</code> 입니다. 여러 개는 쉼표로 구분합니다.</div>
+      <table>
+        <tr><th>구분</th><th>형식 예시</th><th>설명</th></tr>
+        <tr><td>단일 효과</td><td><code>stress:10</code></td><td>스트레스 10 증가</td></tr>
+        <tr><td>복합 효과</td><td><code>money:-5000,mental:-5</code></td><td>돈 5000원 차감 & 멘탈 5 감소</td></tr>
+      </table>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-txt">시트 수정 후 반드시 <strong>[파일] > [공유] > [웹에 게시]</strong>가 <code>CSV</code>로 되어있는지 확인하세요. (최초 1회만 설정)</div>
+    </div>
   </div>
 </div>
 
-<div id="copy-toast" class="copy-toast">복사되었습니다!</div>
-
-<script>
-function updateJSON() {
-  const storyLines = document.getElementById('e-story').value.split('\n').filter(l => l.trim() !== '');
-
-  const parseChoice = (str) => {
-    if (!str) return null;
-    const parts = str.split('|').map(p => p.trim());
-    if (parts.length < 2) return null;
-
-    const effectObj = {};
-    parts[1].split(',').forEach(eff => {
-      const pair = eff.split(':');
-      if (pair.length === 2) effectObj[pair[0].trim()] = parseInt(pair[1].trim());
-    });
-
-    return {
-      label: '▶ ' + parts[0],
-      effect: effectObj,
-      result: [{ t: 'story', m: parts[2] || '...' }]
-    };
-  };
-
-  const scenario = {
-    id: document.getElementById('s-id').value || 'new_scenario',
-    date: document.getElementById('s-date').value || '2000-01-01',
-    eraId: document.getElementById('s-era').value,
-    title: document.getElementById('s-title').value || '제목 없음',
-    desc: document.getElementById('s-desc').value || '설명 없음',
-    icon: '📍',
-    events: [
-      {
-        time: document.getElementById('e-time').value,
-        type: 'scenario',
-        key: 'evt_' + Date.now(),
-        title: document.getElementById('e-title').value || '고정 이벤트',
-        loc: '📍 역사적 장소',
-        desc: storyLines.map(l => ({ t: 'bad', m: l })),
-        choices: [parseChoice(document.getElementById('choice1').value), parseChoice(document.getElementById('choice2').value)].filter(c => c !== null)
-      }
-    ]
-  };
-
-  document.getElementById('json-result').innerText = JSON.stringify(scenario, null, 2);
-}
-
-function copyJSON() {
-  const text = document.getElementById('json-result').innerText;
-  navigator.clipboard.writeText(text);
-  const toast = document.getElementById('copy-toast');
-  toast.style.display = 'block';
-  setTimeout(() => toast.style.display = 'none', 1500);
-}
-
-function resetForm() {
-  if (confirm('모든 내용을 초기화할까요?')) {
-    location.reload();
-  }
-}
-
-// Initial update
-updateJSON();
-</script>
 </body>
 </html>
