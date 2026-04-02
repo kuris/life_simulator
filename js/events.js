@@ -102,9 +102,14 @@ function buildDayEvents(profile, era) {
         result:[{ t:'money', m:'택시비 -' + Math.round(commuteMin*econ.bus*0.5).toLocaleString() + '원. 편하게 도착.' }] },
     ];
     if (commuteMin >= 30) {
-      commuteChoices.push({ label:'▶ 이동 중 업무 처리 (이메일/문서)', type:'normal',
+      commuteChoices.push({ label:
+        eraId==='1980' || eraId==='1997' ? '▶ 이동 중 존다' :
+        '▶ 이동 중 업무 처리 (이메일/문서)',
+        type:'normal',
         effect:{ stress:commuteStress+3, stamina:commuteStamina, money:-transitCost, time:commuteMin, flag:'diligent' },
-        result:[{ t:'good', m:'이동 중에도 일을 했다. 효율적이다.' }] });
+        result:[{ t:'good', m:
+          eraId==='1980' || eraId==='1997' ? '이동 중 단암. 컴퓨터도 폰도 없는 시대다.' :
+          '이동 중에도 일을 했다. 효율적이다.' }] });
       commuteChoices.push({ label:'▶ 이어폰 끼고 팟캐스트/음악 듣는다', type:'normal',
         effect:{ stress:commuteStress-4, stamina:commuteStamina, money:-transitCost, time:commuteMin },
         result:[{ t:'good', m:'정신적 여유를 챙겼다.' }] });

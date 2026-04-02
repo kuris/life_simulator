@@ -27,6 +27,120 @@ var G = {
   historicFired: false,
 };
 
+// ─── 자동저장 / 이어하기 ────────────────────────────────
+var SAVE_KEY = 'vrlife_save_v1';
+
+function saveGame() {
+  try {
+    var snap = {
+      eraId:        G.era ? G.era.id : null,
+      profile:      G.profile,
+      stats:        G.stats,
+      chores:       G.chores,
+      eventIdx:     G.eventIdx,
+      historicFired: G.historicFired,
+      savedAt:      Date.now()
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(snap));
+  } catch(e) {}
+}
+
+function clearSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch(e) {}
+}
+
+function loadSave() {
+  try {
+    var raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch(e) { return null; }
+}
+
+function checkResume() {
+  var snap = loadSave();
+  if (!snap || !snap.eraId) return;
+
+  // 24시간 이상 지나면 저장 데이터 무효화
+  if (Date.now() - snap.savedAt > 24 * 60 * 60 * 1000) { clearSave(); return; }
+
+  var era = null;
+  for (var i = 0; i < ERAS.length; i++) {
+    if (ERAS[i].id === snap.eraId) { era = ERAS[i]; break; }
+  }
+  if (!era) { clearSave(); return; }
+
+  var d = new Date(snap.savedAt);
+  var timeStr = (d.getMonth()+1) + '/' + d.getDate() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+
+  var overlay = document.createElement('div');
+  overlay.id = 'resume-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:9999;';
+
+  var nameDisp = snap.profile.name || (snap.profile.gender === 'female' ? '김민지' : '김철수');
+  var gIcon    = snap.profile.gender === 'female' ? '👩' : '👨';
+
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--surface);border:1px solid var(--primary);border-radius:12px;padding:28px 32px;max-width:380px;width:90%;text-align:center;box-shadow:0 0 40px rgba(0,255,136,.2);';
+  box.innerHTML =
+    '<div style="font-size:32px;margin-bottom:10px">💾</div>' +
+    '<div style="font-size:15px;font-weight:700;color:var(--primary);margin-bottom:6px">이전 게임 기록이 있습니다</div>' +
+    '<div style="font-size:11px;color:var(--dim);margin-bottom:14px">' + timeStr + ' 저장됨</div>' +
+    '<div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:20px;font-size:13px;line-height:2;">' +
+      gIcon + ' ' + nameDisp + ' &nbsp;|&nbsp; ' + era.name + '<br>' +
+      '진행: 이벤트 ' + (snap.eventIdx || 0) + '번째' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;">' +
+      '<button id="resume-continue" style="flex:1;background:var(--primary);color:var(--bg);border:none;border-radius:6px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">⏮ 이어하기</button>' +
+      '<button id="resume-new" style="flex:1;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:6px;padding:11px;font-size:13px;cursor:pointer;font-family:inherit;">🔄 새로 시작</button>' +
+    '</div>';
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  document.getElementById('resume-continue').onclick = function() {
+    overlay.remove();
+    resumeGame(snap, era);
+  };
+  document.getElementById('resume-new').onclick = function() {
+    clearSave();
+    overlay.remove();
+  };
+}
+
+function resumeGame(snap, era) {
+  G.era     = era;
+  G.profile = snap.profile;
+  G.stats   = snap.stats;
+  G.chores  = snap.chores || { done:[], pending:[] };
+  G.historicFired = snap.historicFired || false;
+  document.body.className = era.cssClass;
+
+  G.events   = buildDayEvents(G.profile, G.era);
+  G.eventIdx = snap.eventIdx || 0;
+
+  showScreen('game');
+  if (typeof BGM !== 'undefined') BGM.play(era.id);
+
+  var chip = document.getElementById('game-era-chip');
+  if (chip) { chip.textContent = era.name; chip.style.background = 'var(--primary)'; chip.style.color = 'var(--bg)'; }
+  var dateEl = document.getElementById('side-date');
+  if (dateEl) dateEl.textContent = era.name + ' 어느 날';
+  var priceEl = document.getElementById('s-era-price');
+  if (priceEl) priceEl.textContent = getPriceLabel(era.id);
+
+  setupFamilyPanel();
+  updateSide();
+  clearEl('game-log');
+  clearEl('game-choices');
+
+  log('game-log', 'system', '[ 💾 세이브 데이터 로드 — 이어 플레이 ]');
+  setTimeout(nextEvent, 600);
+}
+
+// 페이지 로드 시 자동 체크
+window.addEventListener('load', function() { setTimeout(checkResume, 500); });
+
 // ─── 유틸 ────────────────────────────────────────────
 function minToTime(m) {
   var total = m % (24 * 60);
@@ -1260,6 +1374,7 @@ function applyChoice(choice) {
   if (s.mental <= 20 && s.mental > 15) log('game-log', 'bad', '⚠ 멘탈이 위험하다. 번아웃 직전.');
 
   updateSide();
+  saveGame();   // 매 선택 후 자동저장
   setTimeout(nextEvent, 750);
 }
 
@@ -1301,6 +1416,7 @@ function handleSpecial(type) {
 // ─── 엔딩 ─────────────────────────────────────────
 function showEnding() {
   showScreen('ending');
+  clearSave();   // 엔딩 도달하면 저장 데이터 삭제
   if (typeof BGM !== 'undefined') BGM.stop();
   if (typeof SFX !== 'undefined') setTimeout(function(){ SFX.play('ending'); }, 300);
   clearEl('ending-log');
@@ -1492,6 +1608,7 @@ function getGrade(score) {
 
 // ─── 리셋 ─────────────────────────────────────────
 function resetGame() {
+  clearSave();   // 리셋 시 저장 데이터 삭제
   if (typeof BGM !== 'undefined') BGM.stop();
   P.gender = null;
   P.age    = null;
