@@ -220,9 +220,17 @@ function buildDayEvents(profile, era) {
     { label:'▶ 커피 먹고 천천히 시작 (-' + econ.coffee.toLocaleString() + '원)', type:'normal',
       effect:{ stress:3, stamina:5, money:-econ.coffee, time:130 },
       result:[{ t:'story', m:'커피로 정신을 차리고 시작했다.' }] },
-    { label:'▶ SNS 보다가 점심시간 됨', type:'bad',
+    { label: eraId==='1980' ? '▶ 동료랑 잡담하다 오전이 감' :
+             eraId==='1997' ? '▶ 삐삐 확인하고 공중전화 다니다가 감' :
+             eraId==='2000' ? '▶ 버디버디/싸이월드 하다가 점심 됨' :
+             eraId==='2010' ? '▶ 카카오톡/트위터 보다 오전이 증발' :
+             '▶ 인스타/유튜브 쇼츠 보다 오전이 증발', type:'bad',
       effect:{ stress:-5, time:120 },
-      result:[{ t:'bad', m:'딴짓으로 오전이 증발했다.' }] },
+      result:[{ t:'bad', m: eraId==='1980' ? '잡담으로 오전이 날아갔다.' :
+                             eraId==='1997' ? '삐삐 뚜뚜뚜... 공중전화 다니느라 오전이 갔다.' :
+                             eraId==='2000' ? '싸이월드 방명록 달고 버디버디 채팅하다 시간이 갔다.' :
+                             eraId==='2010' ? '카톡 단톡방이 울렸다. 답장하다 오전이 증발했다.' :
+                             '알고리즘에 빠졌다. 쇼츠 10분이 1시간이 됐다.' }] },
     { label:'▶ 동료와 잡담하며 시간 보냄', type:'normal',
       effect:{ stress:-8, stamina:-3, time:120, flag:'socialLunch' },
       result:[{ t:'story', m:'수다로 시간이 날아갔다. 그래도 스트레스는 풀렸다.' }] },
@@ -496,9 +504,17 @@ function buildDayEvents(profile, era) {
     { label:'▶ 일찍 잠든다 (숙면)', type:'normal',
       effect:{ stamina:25, stress:-8, flag:'earlyBed' },
       result:[{ t:'good', m:'현명한 선택. 내일을 위한 충전!' }] },
-    { label: eraId==='1980' ? '▶ TV 연속극 보다 잔다' : eraId==='1997' ? '▶ 비디오 빌려와서 보다 잔다' : eraId==='2000' ? '▶ PC로 영화/MP3 듣다 잔다' : '▶ 넷플릭스/유튜브 보다 잔다', type:'normal',
+    { label: eraId==='1980' ? '▶ TV 연속극 보다 잔다' :
+             eraId==='1997' ? '▶ 비디오 빌려와서 보다 잔다' :
+             eraId==='2000' ? '▶ 싸이월드 꾸미고 버디버디 하다가 잔다' :
+             eraId==='2010' ? '▶ 카카오톡/트위터 보다가 잔다' :
+             '▶ 넷플릭스/유튜브 보다 잔다', type:'normal',
       effect:{ stress:-15, stamina:-5 },
-      result:[{ t:'story', m: eraId==='1980' ? '주말의 명화... 밤이 깊어간다.' : eraId==='1997' ? '비디오 한 편. 현실을 잊었다.' : eraId==='2000' ? 'MP3 플레이어에 담아둔 음악이 흘러나온다.' : '알고리즘에 빠져 어느새 새벽 1시다.' }] },
+      result:[{ t:'story', m: eraId==='1980' ? '주말의 명화... 밤이 깊어간다.' :
+                               eraId==='1997' ? '비디오 한 편. 현실을 잊었다.' :
+                               eraId==='2000' ? '싸이월드 방명록에 글 남기고 자야지... 버디버디 알림이 울린다.' :
+                               eraId==='2010' ? '카톡 단톡방이 시끄럽다. 결국 새벽 1시.' :
+                               '알고리즘에 빠져 어느새 새벽 1시다.' }] },
     { label:'▶ 내일 걱정하며 뒤척인다', type:'bad',
       effect:{ stress:12, stamina:-8 },
       result:[{ t:'bad', m:'내일 회의, 돈 걱정... 잠이 안 온다.' }] },

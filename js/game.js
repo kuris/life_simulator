@@ -588,6 +588,7 @@ function selectEra(eraId) {
     age:        P.age    || null,
     employType: null, job: null,
     hasSpouse: false, hasKid: false,
+    kids: [],          // [{ gender:'male'|'female', age:number }, ...]
     company: null, home: null,
     flags: [], rel_spouse: 60, rel_kid: 60
   };
@@ -671,20 +672,123 @@ var CREATE_STEPS = [
   {
     label: 'STEP 4/5 — 자녀',
     skip: function() { return !G.profile.hasSpouse; },
-    logs: [{ t:'system', m:'자녀가 있나요?' }],
+    logs: [{ t:'system', m:'자녀가 있나요? (최대 3명까지 추가할 수 있어요)' }],
     render: function(next) {
-      var opts = [
-        { label:'👧 초등학생 자녀 있음', val:true },
-        { label:'🚫 없음', val:false }
-      ];
-      opts.forEach(function(o) {
-        var b = mkBtn(o.label, function() {
-          G.profile.hasKid = o.val;
-          log('create-log', 'good', '✔ ' + o.label);
+      var p = G.profile;
+      p.kids = [];
+
+      var area = document.getElementById('create-choices');
+
+      function renderKidUI() {
+        area.innerHTML = '';
+
+        // 현재 추가된 아이들 표시
+        if (p.kids.length > 0) {
+          var listDiv = document.createElement('div');
+          listDiv.style.cssText = 'margin-bottom:10px;';
+          p.kids.forEach(function(kid, idx) {
+            var icon = kid.gender === 'female' ? '👧' : '👦';
+            var row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:12px;color:var(--text);';
+            row.innerHTML = '<span>' + icon + ' 아이' + (idx+1) + ' · ' + (kid.gender === 'female' ? '여자' : '남자') + ' · ' + kid.age + '세</span>' +
+              '<button onclick="G.profile.kids.splice(' + idx + ',1);" style="background:rgba(255,68,68,.15);border:1px solid #ff4444;color:#ff4444;border-radius:3px;padding:1px 8px;font-size:10px;cursor:pointer;font-family:inherit;">✕</button>';
+            row.querySelector('button').onclick = function() {
+              p.kids.splice(idx, 1);
+              renderKidUI();
+            };
+            listDiv.appendChild(row);
+          });
+          area.appendChild(listDiv);
+        }
+
+        // 3명 미만이면 추가 폼 표시
+        if (p.kids.length < 3) {
+          var formDiv = document.createElement('div');
+          formDiv.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;';
+
+          var kidNum = p.kids.length + 1;
+          formDiv.innerHTML =
+            '<div style="font-size:11px;color:var(--primary);margin-bottom:8px;">아이' + kidNum + '번 정보</div>' +
+            '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
+              '<button id="kid-btn-male" class="btn-choice" style="flex:1;padding:7px;">👦 남자</button>' +
+              '<button id="kid-btn-female" class="btn-choice" style="flex:1;padding:7px;">👧 여자</button>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">' +
+              '<span style="font-size:11px;color:var(--dim);">나이:</span>' +
+              '<input id="kid-age-input" type="number" min="1" max="25" placeholder="예) 5" ' +
+                'style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:3px;padding:4px 8px;font-family:inherit;font-size:13px;width:80px;" />' +
+              '<span style="font-size:11px;color:var(--dim);">세</span>' +
+            '</div>' +
+            '<button id="kid-add-btn" class="btn-choice" style="width:100%;padding:8px;">➕ 이 아이 추가</button>';
+
+          area.appendChild(formDiv);
+
+          var maleBtn   = formDiv.querySelector('#kid-btn-male');
+          var femaleBtn = formDiv.querySelector('#kid-btn-female');
+          var addBtn    = formDiv.querySelector('#kid-add-btn');
+          var ageInput  = formDiv.querySelector('#kid-age-input');
+          var kidGender = 'male';
+
+          maleBtn.onclick = function() {
+            kidGender = 'male';
+            maleBtn.style.borderColor = 'var(--primary)';
+            femaleBtn.style.borderColor = 'var(--border)';
+          };
+          femaleBtn.onclick = function() {
+            kidGender = 'female';
+            femaleBtn.style.borderColor = 'var(--primary)';
+            maleBtn.style.borderColor = 'var(--border)';
+          };
+
+          addBtn.onclick = function() {
+            var age = parseInt(ageInput.value, 10);
+            if (isNaN(age) || age < 1 || age > 25) {
+              ageInput.style.borderColor = '#ff4444';
+              return;
+            }
+            p.kids.push({ gender: kidGender, age: age });
+            p.hasKid = true;
+            if (typeof SFX !== 'undefined') SFX.play('click');
+            renderKidUI();
+          };
+        }
+
+        // 완료 / 자녀 없음 버튼
+        var doneDiv = document.createElement('div');
+        doneDiv.style.cssText = 'display:flex;gap:6px;margin-top:4px;';
+
+        var noneBtn = document.createElement('button');
+        noneBtn.className = 'btn-choice';
+        noneBtn.style.flex = '1';
+        noneBtn.textContent = '🚫 자녀 없음';
+        noneBtn.onclick = function() {
+          p.kids = []; p.hasKid = false;
+          log('create-log', 'good', '✔ 자녀 없음 (솔로 또는 딩크)');
           next();
-        });
-        document.getElementById('create-choices').appendChild(b);
-      });
+        };
+
+        var doneBtn = document.createElement('button');
+        doneBtn.className = 'btn-choice';
+        doneBtn.style.cssText = 'flex:1;border-color:var(--primary);color:var(--primary);';
+        doneBtn.textContent = '✅ 입력 완료 (' + p.kids.length + '명)';
+        doneBtn.disabled = p.kids.length === 0;
+        doneBtn.style.opacity = p.kids.length === 0 ? '0.4' : '1';
+        doneBtn.onclick = function() {
+          if (p.kids.length === 0) return;
+          p.hasKid = true;
+          var summary = p.kids.map(function(k, i) {
+            return '아이' + (i+1) + ' ' + (k.gender === 'female' ? '👧' : '👦') + ' ' + k.age + '세';
+          }).join(' / ');
+          log('create-log', 'good', '✔ 자녀 ' + p.kids.length + '명: ' + summary);
+          next();
+        };
+
+        doneDiv.appendChild(noneBtn);
+        if (p.kids.length > 0) doneDiv.appendChild(doneBtn);
+        area.appendChild(doneDiv);
+      }
+
+      renderKidUI();
     }
   },
   {
@@ -802,7 +906,14 @@ function finishCreate() {
   log('create-log', 'system', '  직업: ' + p.job.icon + ' ' + p.job.label);
   log('create-log', 'system', '  고용: ' + p.employType.label);
   var familyStr = p.hasSpouse ? (spouseWord + ' 있음') : '솔로';
-  if (p.hasKid) familyStr += ' / 자녀 있음';
+  if (p.hasKid && p.kids && p.kids.length > 0) {
+    var kidSummary = p.kids.map(function(k, i) {
+      return (k.gender === 'female' ? '👧' : '👦') + k.age + '세';
+    }).join(' ');
+    familyStr += ' / 자녀 ' + p.kids.length + '명 (' + kidSummary + ')';
+  } else if (p.hasKid) {
+    familyStr += ' / 자녀 있음';
+  }
   log('create-log', 'system', '  가족: ' + familyStr);
   log('create-log', 'system', '  근무지: ' + p.company.label);
   if (p.home.commute > 0) {
@@ -884,15 +995,23 @@ function setupFamilyPanel() {
       '</div>' +
       '<div class="rel-hearts" id="hearts-sp">' + hearts(p.rel_spouse) + '</div>';
   }
-  if (p.hasKid) {
-    html +=
-      '<div class="rel-row" style="margin-top:6px">' +
-        '<div class="rel-name">👶 자녀</div>' +
-        '<div class="bar-wrap" style="flex:1"><div class="bar-fill bar-blue" id="bar-kid" style="width:' + p.rel_kid + '%"></div></div>' +
-        '<span class="stat-num" id="num-kid">' + p.rel_kid + '</span>' +
-      '</div>' +
-      '<div class="rel-hearts" id="hearts-kid">' + hearts(p.rel_kid) + '</div>';
-  }
+  // 아이들 마다 관계 바 표시
+  var kids = (p.kids && p.kids.length > 0) ? p.kids : (p.hasKid ? [{ gender:'male', age:null }] : []);
+  kids.forEach(function(kid, idx) {
+    var kIcon = kid.gender === 'female' ? '👧' : '👦';
+    var kLabel = '아이' + (kids.length > 1 ? (idx + 1) : '') + (kid.age ? ' (' + kid.age + '세)' : '');
+    var barId  = 'bar-kid-' + idx;
+    var numId  = 'num-kid-' + idx;
+    var hrtId  = 'hearts-kid-' + idx;
+    // 관계도: 첫번째 rel_kid 공유, 나머지는 기본 60
+    var rel = (idx === 0) ? p.rel_kid : (p['rel_kid_' + idx] || 60);
+    html += '<div class="rel-row" style="margin-top:5px">' +
+      '<div class="rel-name">' + kIcon + ' ' + kLabel + '</div>' +
+      '<div class="bar-wrap" style="flex:1"><div class="bar-fill bar-blue" id="' + barId + '" style="width:' + rel + '%"></div></div>' +
+      '<span class="stat-num" id="' + numId + '">' + rel + '</span>' +
+    '</div>' +
+    '<div class="rel-hearts" id="' + hrtId + '">' + hearts(rel) + '</div>';
+  });
   area.innerHTML = html;
 }
 
