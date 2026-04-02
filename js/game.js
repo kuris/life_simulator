@@ -25,6 +25,8 @@ var G = {
   eventIdx: 0,
   createStep: 0,
   historicFired: false,
+  scenarios: [],
+  currentScenario: null,
 };
 
 // ─── 자동저장 / 이어하기 ────────────────────────────────
@@ -144,6 +146,8 @@ window.addEventListener('load', function() {
   setTimeout(checkResume, 500);
   // 첫 상호작용으로 오디오 컨텍스트 활성화 및 타이틀 음악
   document.addEventListener('click', startTitleBgm, { once: true });
+  // 시나리오 데이터 로드
+  fetchScenarios();
 });
 
 function startTitleBgm() {
@@ -1800,4 +1804,103 @@ function resetGame() {
   cIdx = 0;
   showScreen('title');
   document.body.className = 'era-2026';
+}
+
+async function fetchScenarios() {
+  try {
+    var res = await fetch('data/scenarios.json');
+    var data = await res.json();
+    G.scenarios = data.scenarios || [];
+    renderScenarioCards();
+  } catch (e) {
+    console.warn('시나리오 로드 실패:', e);
+  }
+}
+
+function renderScenarioCards() {
+  var container = document.getElementById('scenario-grid');
+  if (!container) return;
+  container.innerHTML = '';
+
+  G.scenarios.forEach(function(s) {
+    var card = document.createElement('div');
+    card.className = 'scenario-card';
+    card.onclick = function() { startScenario(s.id); };
+    card.innerHTML =
+      '<div class="sc-icon">' + (s.icon || '📍') + '</div>' +
+      '<div class="sc-content">' +
+        '<div class="sc-title">' + s.title + '</div>' +
+        '<div class="sc-date">' + s.date + '</div>' +
+        '<div class="sc-desc">' + s.desc + '</div>' +
+      '</div>' +
+      '<div class="sc-footer">' +
+        '<span class="sc-diff">' + (s.difficulty || '★★★☆☆') + '</span>' +
+        '<span class="sc-btn">입장하기 →</span>' +
+      '</div>';
+    container.appendChild(card);
+  });
+}
+
+function startScenario(id) {
+  var s = G.scenarios.find(function(item) { return item.id === id; });
+  if (!s) return;
+
+  var era = ERAS.find(function(e) { return e.id === s.eraId; });
+  if (!era) return;
+
+  if (typeof SFX !== 'undefined') SFX.play('click');
+  
+  // 시나리오 초기화
+  G.era = era;
+  G.currentScenario = s;
+  document.body.className = era.cssClass;
+
+  // 기본 프로필 설정 (시나리오 추천 직업 등 활용)
+  var job = era.jobs.find(function(j) { return j.id === s.recommend; }) || era.jobs[0];
+  var home = era.homeLocations[0];
+
+  G.profile = {
+    gender: 'male',
+    name: '김철수',
+    job: job,
+    home: home,
+    employType: EMPLOY_TYPES[0],
+    hasSpouse: true,
+    hasKid: true,
+    rel_spouse: 60,
+    rel_kid: 60,
+    flags: ['scenario_mode']
+  };
+
+  G.stats = {
+    stress: 20, stamina: 100, mental: 100,
+    time: 390, // 06:30
+    income: job.dailyPay, expense: home.rent / 30,
+    money: era.econ.wage * 0.5 // 자산 절반 시작
+  };
+
+  G.events = buildDayEvents(G.profile, G.era);
+  G.eventIdx = 0;
+
+  showScreen('game');
+  if (typeof BGM !== 'undefined') BGM.stop();
+  if (typeof BGM !== 'undefined') BGM.play(era.id);
+
+  // HUD 업데이트
+  var chip = document.getElementById('game-era-chip');
+  if (chip) chip.textContent = s.title; 
+  var dateEl = document.getElementById('side-date');
+  if (dateEl) dateEl.textContent = s.date;
+
+  updateSide();
+  clearEl('game-log');
+  clearEl('game-choices');
+
+  log('game-log', 'history', '══════════════════════════════════');
+  log('game-log', 'history', '  🕰️ 타임머신 가동: ' + s.date);
+  log('game-log', 'history', '  시나리오: ' + s.title);
+  log('game-log', 'history', '══════════════════════════════════');
+  log('game-log', 'story', s.desc);
+  
+  setTimeout(nextEvent, 1000);
 }

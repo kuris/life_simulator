@@ -66,6 +66,20 @@ const ERAS = [
       '"빨리빨리" 문화가 한창 형성되던 시절.',
       '야근하다 새벽 버스를 놓치면 그냥 사무실에서 잔다.',
     ],
+    vocabulary: {
+      reflection: '천장을 바라보며',
+      comm: '공중전화',
+      distraction: '동료와 잡담',
+      news: '라디오',
+      night_life: 'TV 연속극'
+    },
+    features: {
+      internet: false,
+      sns: false,
+      smartphone: false,
+      pager: false,
+      ai: false
+    }
   },
 
   // ── 1997년 IMF ────────────────────────────────
@@ -176,12 +190,26 @@ const ERAS = [
       ]
     },
     atmosphere: [
-      '"부도" "구조조정" "정리해고" 뉴스가 매일 터진다.',
+      '"부도" "구조조정" "정리해고" 뉴스가 매일 터린다.',
       '지하철에 실직자들이 눈에 띄게 늘었다.',
       '편의점 봉지라면이 저녁 식사가 된 사람들.',
       '금 모으기 운동 — 국민들이 자발적으로 결혼반지를 내놓는다.',
       '대기업들이 하루아침에 사라진다.',
     ],
+    vocabulary: {
+      reflection: '삐삐를 확인하며',
+      comm: '삐삐와 공중전화',
+      distraction: '삐삐 확인',
+      news: '신문과 뉴스',
+      night_life: '비디오 대여'
+    },
+    features: {
+      internet: false,
+      sns: false,
+      smartphone: false,
+      pager: true,
+      ai: false
+    }
   },
 
   // ── 2000년대 ──────────────────────────────────
@@ -286,6 +314,20 @@ const ERAS = [
       '폴더폰이 최신 기기. 문자 10원, 전화 분당 30원.',
       '"닷컴" 이름만 달면 투자가 몰렸다.',
     ],
+    vocabulary: {
+      reflection: '싸이월드 방명록을 보며',
+      comm: '버디버디와 야후 메신저',
+      distraction: '미니홈피 꾸미기',
+      news: '포털 사이트',
+      night_life: '싸이월드/버디버디'
+    },
+    features: {
+      internet: true,
+      sns: 'cyworld',
+      smartphone: false,
+      pager: false,
+      ai: false
+    }
   },
 
   // ── 2010년대 ──────────────────────────────────
@@ -390,6 +432,20 @@ const ERAS = [
       '배달 앱이 등장하면서 짜장면 배달비가 생겼다.',
       '유튜브로 첫 수익을 낸 사람들의 이야기가 화제.',
     ],
+    vocabulary: {
+      reflection: '카톡 알림을 끄며',
+      comm: '카카오톡',
+      distraction: '카톡과 페이스북',
+      news: '포탈과 뉴스',
+      night_life: '카톡/트위터/유튜브'
+    },
+    features: {
+      internet: true,
+      sns: 'kakaotalk',
+      smartphone: true,
+      pager: false,
+      ai: false
+    }
   },
 
   // ── 2020년 코로나 ──────────────────────────────
@@ -498,6 +554,20 @@ const ERAS = [
       '손소독제가 금처럼 귀하던 시절.',
       '치킨 배달이 1시간 이상 걸린다. 수요 폭발.',
     ],
+    vocabulary: {
+      reflection: '스마트폰을 내려놓고',
+      comm: '카카오톡과 줌(Zoom)',
+      distraction: '유튜브와 인스타',
+      news: 'SNS 뉴스',
+      night_life: '넷플릭스/유튜브'
+    },
+    features: {
+      internet: true,
+      sns: 'instagram',
+      smartphone: true,
+      pager: false,
+      ai: false
+    }
   },
 
   // ── 2026년 현재 ──────────────────────────────
@@ -606,6 +676,20 @@ const ERAS = [
       '유튜브에는 "AI로 연봉 2배 높이기" 영상이 넘쳐난다.',
       'AI 면접관이 사람을 평가하는 것이 더 이상 낯설지 않은 시대.',
     ],
+    vocabulary: {
+      reflection: '스마트폰을 내려놓고',
+      comm: '카카오톡과 AI 비서',
+      distraction: '유튜브 쇼츠',
+      news: '맞춤형 AI 뉴스',
+      night_life: '넷플릭스/유튜브 쇼츠'
+    },
+    features: {
+      internet: true,
+      sns: 'instagram',
+      smartphone: true,
+      pager: false,
+      ai: true
+    }
   },
 ];
 

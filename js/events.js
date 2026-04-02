@@ -33,6 +33,13 @@ function buildDayEvents(profile, era) {
           choices: phil.choices
         };
       }
+    } else if (slot.type === 'scenario') {
+      var s = slot.eventData;
+      eventObj = {
+        id: s.key, time: s.time, loc: s.loc || '⚡ 역사적 순간',
+        desc: [{ t:'time', m:'[ ' + s.time + ' ] ' + s.title }].concat(s.desc),
+        choices: s.choices, ascii: ASCII[s.ascii] || ASCII.OFFICE
+      };
     }
 
     if (eventObj) {
@@ -71,6 +78,19 @@ function getDayBlueprint(p, e, isRemote) {
   bp.push({ time: '21:00', type: 'random', key: 'INCOME_RANDOM' });
   bp.push({ time: '21:30', type: 'phil', key: 'evening' });
   bp.push({ time: '22:00', type: 'fixed', key: 'NIGHT' });
+
+  // 시나리오 이벤트 주입 (데이터 기반)
+  if (G.currentScenario && G.currentScenario.events) {
+    G.currentScenario.events.forEach(function(se) {
+      bp.push({ time: se.time, type: 'scenario', eventData: se });
+    });
+  }
+
+  // 시간순 정렬
+  bp.sort(function(a, b) {
+    return a.time.localeCompare(b.time);
+  });
+
   return bp;
 }
 
@@ -173,13 +193,6 @@ var FIXED_EVENTS = {
       choices.push({ label:'▶ 이어폰 끼고 팟캐스트/음악 듣는다', type:'normal',
         effect:{ stress:commuteStress-4, stamina:commuteStamina, money:-transitCost, time:min },
         result:[{ t:'good', m:'정신적 여유를 챙겼다.' }] });
-    }
-
-    var news = getNews(e.id);
-    if (news) {
-      // In this new architecture, we return one event. News can be a side-effect log or a separate slot.
-      // But for simplicity in this refactor, we'll keep it as a desc line if needed, or handle it in the loop.
-      // Actually, the loop handles it if it's a separate slot.
     }
 
     var ascii = (e.id === '1980') ? ASCII.BUS : ASCII.COMMUTE;
@@ -341,17 +354,9 @@ var FIXED_EVENTS = {
     var desc = [{ t:'time',  m:'[ 10:00 PM ] 하루가 끝나간다.' }, { t:'story', m:'오늘 하루를 어떻게 마무리할까?' }];
     var choices = [
       { label:'▶ 일찍 잠든다 (숙면)', type:'normal', effect:{ stamina:25, stress:-8, flag:'earlyBed' }, result:[{ t:'good', m:'현명한 선택. 내일을 위한 충전!' }] },
-      { label: e.id==='1980' ? '▶ TV 연속극 보다 잔다' :
-               e.id==='1997' ? '▶ 비디오 빌려와서 보다 잔다' :
-               e.id==='2000' ? '▶ 싸이월드 꾸미고 버디버디 하다가 잔다' :
-               e.id==='2010' ? '▶ 카카오톡/트위터 보다가 잔다' :
-               '▶ 넷플릭스/유튜브 보다 잔다', type:'normal',
+      { label: '▶ ' + e.vocabulary.night_life + ' 보다 잔다', type:'normal',
         effect:{ stress:-15, stamina:-5 },
-        result:[{ t:'story', m: e.id==='1980' ? '주말의 명화... 밤이 깊어간다.' :
-                                 e.id==='1997' ? '비디오 한 편. 현실을 잊었다.' :
-                                 e.id==='2000' ? '싸이월드 방명록 달고 잔다.' :
-                                 e.id==='2010' ? '카톡 보다가 새벽 1시.' :
-                                 '알고리즘에 빠졌다.' }] },
+        result:[{ t:'story', m: e.vocabulary.night_life + '(으)로 밤이 깊어간다.' }] },
       { label:'▶ 가벼운 스트레칭 후 취침', type:'normal', effect:{ stamina:15, stress:-5 }, result:[{ t:'good', m:'몸이 한결 가볍다. 좋은 밤.' }] },
     ];
     if (p.hasSpouse) choices.push({ label:'▶ 배우자와 오늘 하루 이야기 나눈다', type:'family', effect:{ stress:-18, rel_sp:12, time:45 }, result:[ { t:'npc', m:'배우자: "오늘도 수고했어."' }, { t:'relation', m:'서로의 하루를 공유한 소중한 시간.' } ] });
@@ -665,7 +670,7 @@ function getFamilyPool(p, e) {
       choices:[
         { label:'▶ 집중해서 들어준다 (30분)', type:'family', effect:{ rel_sp:15, stress:-8, stamina:-3, time:30 },
           result:[{ t:'relation', m:'배우자와의 관계가 좋아졌다.' }, { t:'npc', m:'배우자: "당신이 제일 잘 들어줘. 힘이 돼."' }] },
-        { label:'▶ 폰 보면서 "응응"', type:'bad', effect:{ rel_sp:-8, stress:-3 },
+        { label:'▶ ' + (e.features.smartphone ? '폰 보면서 "응응"' : '딴청 피우며 "응응"'), type:'bad', effect:{ rel_sp:-8, stress:-3 },
           result:[{ t:'bad', m:'배우자: "...됐어. 당신은 항상 그래." (표정이 굳는다)' }] },
         { label:'▶ 나도 힘들었다고 털어놓는다', type:'family', effect:{ rel_sp:10, stress:-15, time:45 },
           result:[{ t:'relation', m:'서로를 이해하는 시간이 됐다.' }] },
@@ -740,8 +745,8 @@ function getFamilyPool(p, e) {
           result:[{ t:'relation', m:'아이와의 즐거운 시간!' }, { t:'npc', m:'아이: "최고야!!!"' }] },
         { label:'▶ 30분만 놀아준다', type:'family', effect:{ rel_kid:10, stress:-5, time:30 },
           result:[{ t:'good', m:'30분이라도 함께했다.' }] },
-        { label:'▶ 유튜브 틀어주고 쉰다', type:'bad', effect:{ rel_kid:-6, stamina:5 },
-          result:[{ t:'bad', m:'유튜브 육아... 아이가 시무룩하다.' }] },
+        { label:'▶ ' + (e.features.internet ? '유튜브/TV 틀어주고 쉰다' : '그림책 던져주고 쉰다'), type:'bad', effect:{ rel_kid:-6, stamina:5 },
+          result:[{ t:'bad', m: (e.features.internet ? '유튜브 육아...' : '방임 육아...') + ' 아이가 시무룩하다.' }] },
         { label:'▶ 학원 숙제 먼저 시킨다', type:'bad', effect:{ rel_kid:-3, stamina:2 },
           result:[{ t:'bad', m:'아이: "에이..." (투정)' }] },
       ]
@@ -855,7 +860,7 @@ function getIncomePool(p, e) {
 
   pool.push({
     title:'💭 오늘 하루를 돌아본다',
-    descLines: [{ t:'story', m:'폰을 내려놓고 오늘을 되새긴다.' }],
+    descLines: [{ t:'story', m: e.vocabulary.reflection + ' 오늘 하루를 되새긴다.' }],
     choices:[
       { label:'▶ 감사일기를 쓴다', type:'normal', effect:{ stress:-10, flag:'gratitude' }, result:[{ t:'good', m:'작은 것에 감사하는 마음. 내일도 버틸 수 있다.' }] },
       { label:'▶ 내일 계획을 세운다', type:'normal', effect:{ stress:3, flag:'diligent' }, result:[{ t:'good', m:'준비된 내일. 걱정이 조금 줄었다.' }] },
