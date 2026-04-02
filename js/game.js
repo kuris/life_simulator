@@ -2042,7 +2042,7 @@ function startScenario(id) {
   G.profile = {
     gender: 'male',
     name: '김철수',
-    job: job,
+    company: job, // 'job' 대신 'company'로 명시
     home: home,
     employType: EMPLOY_TYPES[0],
     hasSpouse: true,
