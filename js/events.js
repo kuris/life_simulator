@@ -12,11 +12,13 @@ function buildDayEvents(profile, era) {
   var eraId      = e.id;
 
   var ev = [];
+  var weather = getWeather();
+  var weatherIcon = ASCII[weather.id.toUpperCase()] || ASCII.SUNNY;
 
   // ── 01. 기상 ────────────────────────────────
   var wakeDesc = [
-    { t:'time',  m:'[ 06:30 AM ] 알람이 울린다.' },
-    { t:'story', m: e.name + '의 아침. 오늘도 어김없이 하루가 시작된다.' },
+    { t:'time',  m:'[ 06:30 AM ] 알람이 울린다. (' + weather.label + ' 날씨)' },
+    { t:'story', m: e.name + '의 아침. 창밖은 ' + weather.label + ' 풍경이다.' },
     { t:'system', m:'💭 ' + e.atmosphere[Math.floor(Math.random()*e.atmosphere.length)] },
   ];
   if (p.hasSpouse) wakeDesc.push({ t:'npc', m:'배우자: "일어나야지... 오늘도 힘내."' });
@@ -34,7 +36,7 @@ function buildDayEvents(profile, era) {
       result:[{ t:'bad', m:'지각할 것 같다. 택시를 잡았다. (-' + (econ.bus*10).toLocaleString() + '원)' }] },
   ];
 
-  ev.push({ id:'wake', time:'06:30', loc:'🏠 집 — 침실', ascii: ASCII.WAKE, desc:wakeDesc, choices:wakeChoices });
+  ev.push({ id:'wake', time:'06:30', loc:'🏠 집 — 침실', ascii: weatherIcon, desc:wakeDesc, choices:wakeChoices });
 
   // ── 02. 아침 준비 ────────────────────────────
   var morningDesc = [
@@ -78,6 +80,12 @@ function buildDayEvents(profile, era) {
       result:[{ t:'story', m:'마스크 없이는 건물에 못 들어간다.' }] });
   }
 
+  // 날씨와 상태에 따른 아침 추가 활동 무작위 생성
+  if (Math.random() > 0.5) {
+    var act = getMorningActivity(weather);
+    morningChoices.push(act.choice);
+  }
+
   ev.push({ id:'morning', time:'07:00', loc:'🏠 집 — 주방', desc:morningDesc, choices:morningChoices });
 
   // ── 03. 출근 ────────────────────────────────
@@ -115,7 +123,8 @@ function buildDayEvents(profile, era) {
         result:[{ t:'good', m:'정신적 여유를 챙겼다.' }] });
     }
 
-    ev.push({ id:'commute', time:'07:40', loc:'🚇 출근길 (' + commuteMin + '분)', ascii: ASCII.COMMUTE, desc:commuteDesc, choices:commuteChoices });
+    var commuteAscii = (eraId === '1980') ? ASCII.BUS : ASCII.COMMUTE;
+    ev.push({ id:'commute', time:'07:40', loc:(eraId==='1980' ? '🚌' : '🚇') + ' 출근길 (' + commuteMin + '분)', ascii: commuteAscii, desc:commuteDesc, choices:commuteChoices });
   } else {
     var remoteDesc = [
       { t:'time',  m:'[ 09:00 AM ] 재택근무 시작.' },
@@ -266,7 +275,8 @@ function buildDayEvents(profile, era) {
       result:[{ t:'good', m:'AI 자동화 세팅 완료. 다음 주 업무가 줄어들 것이다.' }] });
   }
 
-  ev.push({ id:'morning_work', time:'09:00', loc:'💼 ' + p.company.label, ascii: ASCII.WORKING, desc:workDesc, choices:workChoices });
+  var officeAscii = (eraId === '1980') ? ASCII.FACTORY : ASCII.WORKING;
+  ev.push({ id:'morning_work', time:'09:00', loc:'💼 ' + p.company.label, ascii: officeAscii, desc:workDesc, choices:workChoices });
 
   // ── 06. 오전 랜덤 이벤트 (시대별) ────────────────
   var morningPool = getMorningPool(p, e);
@@ -333,8 +343,9 @@ function buildDayEvents(profile, era) {
   // [New] Philosophical Moment - Lunchtime
   var philLunch = getPhilosophicalMoment(p, e, 'lunch');
   if (philLunch) {
+    var philAscii = (eraId === '2026') ? ASCII.MACHINE : (Math.random() > 0.5 ? ASCII.COFFEE : ASCII.SODA);
     ev.push({
-      id:'phil_lunch', time:'13:00', loc:'💭 식후 — 고찰', ascii: ASCII.COFFEE,
+      id:'phil_lunch', time:'13:00', loc:'💭 식후 — 고찰', ascii: philAscii,
       desc:[ { t:'time', m:'[ 01:00 PM ] 식사를 마치고 짧은 생각.' } ].concat(philLunch.descLines),
       choices: philLunch.choices
     });
@@ -371,7 +382,13 @@ function buildDayEvents(profile, era) {
 
   ev.push({ id:'afternoon_work', time:'14:00', loc:'💼 오후 업무', desc:pmDesc, choices:pmChoices });
 
-  // ── 09. 오후 랜덤 이벤트 ──────────────────────
+  // ── 09. 랜덤 돌발 이벤트 (Wildcard) ────────────────
+  if (Math.random() < 0.2) { // 20% 확률로 돌발 상황
+    var wildEv = WILDCARD_POOL[Math.floor(Math.random() * WILDCARD_POOL.length)];
+    ev.push(Object.assign({}, wildEv, { time:'16:30' }));
+  }
+
+  // ── 10. 오후 랜덤 이벤트 ──────────────────────
   var afternoonPool = getAfternoonPool(p, e);
   if (afternoonPool.length > 0) {
     var ae = afternoonPool[Math.floor(Math.random()*afternoonPool.length)];
@@ -1119,6 +1136,67 @@ var PHIL_POOL = {
   ]
 };
 
+var REFLECTION_POOL = {
+  normal: [
+    "이 선택이 10년 뒤의 나에게 어떤 의미로 남을까?",
+    "우리는 결과를 위해 사는가, 아니면 과정을 위해 사는가?",
+    "잠시 멈춰 서서 숨을 고르는 것만으로도 충분할 때가 있다.",
+    "나의 가치는 타인의 시선에서 오는가, 내면의 확신에서 오는가?",
+    "꿈을 쫓는 것은 용기일까, 아니면 현실로부터의 도피일까?"
+  ],
+  work: [
+    "일은 삶의 목적일까, 아니면 단지 생존을 위한 수단일까?",
+    "성취감 뒤에 찾아오는 공허함은 어디서 오는 것일까?",
+    "나의 시간과 맞바꾼 이 소득은 정당한 가치를 지니고 있는가?",
+    "조직의 부품이 된다는 것은 나를 잃는 것일까, 우리를 얻는 것일까?"
+  ],
+  family: [
+    "익숙함이라는 이름 아래, 소중함을 잊고 살지는 않았나?",
+    "사랑은 희생을 통해 증명되는 것일까, 아니면 공유를 통해 피어나는 것일까?",
+    "가장 가까운 사람에게 나는 어떤 존재로 기억되고 싶은가?"
+  ],
+  money: [
+    "돈으로 살 수 없는 것은 정말로 존재하지 않는 것일까?",
+    "풍요로움은 통장의 잔고일까, 아니면 마음의 여유일까?",
+    "소유가 늘어날수록 나는 더 자유로워지는가, 아니면 구속되는가?"
+  ],
+  romance: [
+    "우연한 눈맞춤에 가슴이 설레는 것은 본능일까, 운명일까?",
+    "누군가를 알아간다는 것은 나를 개방하는 과정이다.",
+    "함께 걷는 것만으로도 세상이 달라 보일 수 있다."
+  ]
+};
+
+var FORTUNE_POOL = [
+  { id:'lottery_found', title:'🤞 길에서 복권을 주웠다!', loc:'🏢 길거리', ascii:'LOTTERY', desc:[{t:'story', m:'바닥에 떨어진 낡은 복권 한 장. 버려진 것 같은데...'}],
+    choices:[
+      { label:'▶ 주워서 번호를 확인한다', type:'money', effect:{ special:'lotto' }, result:[{t:'good', m:'혹시 모를 행운을 기대해본다.'}] },
+      { label:'▶ 그냥 지나친다', type:'normal', effect:{ mental:3 }, result:[{t:'story', m:'정직한 삶이 최고다.'}] }
+    ]
+  },
+  { id:'noble_person', title:'✨ 뜻밖의 인연', loc:'💼 사무실/카페', ascii:'MENTOR', desc:[{t:'npc', m:'어떤 분: "자네, 눈빛이 살아있구먼. 내 조언 하나 해주지..."'}],
+    choices:[
+      { label:'▶ 진중하게 조언을 경청한다', type:'normal', effect:{ mental:20, stress:-15 }, result:[{t:'good', m:'귀인을 만나 마음의 짐을 덜었다.'}] },
+      { label:'▶ 바쁘다며 정중히 거절한다', type:'normal', effect:{ stamina:5 }, result:[{t:'story', m:'자신의 길은 스스로 정하는 법.'}] }
+    ]
+  }
+];
+
+var ROMANCE_POOL = [
+  { id:'romance_spark', title:'💖 미묘한 시선', loc:'🏢 사무실 복도', ascii:'HEART', desc:[{t:'story', m:'평소 눈여겨보던 동료와 눈이 마주쳤다.'}],
+    choices:[
+      { label:'▶ 가벼운 미소를 지어보인다', type:'family', effect:{ rel_sp:-5, stress:-10, mental:15 }, result:[{t:'good', m:'서로의 온기가 느껴지는 찰나.'}] },
+      { label:'▶ 서둘러 시선을 피한다', type:'normal', effect:{ stress:5 }, result:[{t:'inner', m:'두근거리는 마음을 진정시킨다.'}] }
+    ]
+  },
+  { id:'romance_cafe', title:'☕ 우연한 합석', loc:'☕ 점심시간 카페', ascii:'HEART', desc:[{t:'story', m:'카페가 꽉 찼다. 우연히 합석하게 된 사람의 향기가 좋다.'}],
+    choices:[
+      { label:'▶ 가벼운 인사를 건넨다', type:'family', effect:{ rel_sp:-10, mental:20 }, result:[{t:'good', m:'새로운 세상이 열릴 것만 같다.'}] },
+      { label:'▶ 커피만 빨리 마시고 일어난다', type:'normal', effect:{ stamina:5 }, result:[{t:'story', m:'각박한 사회인의 길.'}] }
+    ]
+  }
+];
+
 function getPhilosophicalMoment(p, e, timeKey) {
   var pool = PHIL_POOL[timeKey] || [];
   if (pool.length === 0) return null;
@@ -1127,3 +1205,63 @@ function getPhilosophicalMoment(p, e, timeKey) {
   var idx = Math.floor(Math.random() * pool.length);
   return pool[idx];
 }
+
+function getReflection(type) {
+  var key = 'normal';
+  if (['work','bad'].indexOf(type) >=0) key = 'work';
+  if (type === 'family') key = 'family';
+  if (type === 'money') key = 'money';
+  if (type === 'romance') key = 'romance';
+  
+  var pool = REFLECTION_POOL[key] || REFLECTION_POOL.normal;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function getWeather() {
+  var r = Math.random();
+  if (r < 0.4) return { id:'sunny',  label:'맑은',  eff:{ mental:5 } };
+  if (r < 0.7) return { id:'cloudy', label:'흐린',  eff:{ stress:2 } };
+  if (r < 0.9) return { id:'rainy',  label:'비오는', eff:{ stress:5, stamina:-5 } };
+  return { id:'snowy',  label:'눈오는', eff:{ stress:8, stamina:-8 } };
+}
+
+function getMorningActivity(weather) {
+  var activities = [
+    { id:'jog', label:'🏃 근처 공원 조깅 (20분)', type:'normal', ascii:'JOGGING',
+      eff:{ stamina:-10, stress:-15, time:20 }, res:{ t:'good', m:'땀을 흘리니 몸이 가볍다. 활기찬 시작!' } },
+    { id:'walk', label:'🚶 동네 가벼운 산책 (15분)', type:'normal', ascii:'WALKING',
+      eff:{ stamina:-3, stress:-10, time:15 }, res:{ t:'good', m:'제법 상쾌한 아침 공기.' } },
+    { id:'cycle', label:'🚲 자전거 라이딩 (25분)', type:'normal', ascii:'CYCLING',
+      eff:{ stamina:-15, stress:-20, time:25 }, res:{ t:'good', m:'허벅지가 탄탄해지는 느낌!' } },
+    { id:'cook', label:'🍳 따뜻한 아침 식사 직접 요리', type:'normal', ascii:'COOKING',
+      eff:{ stamina:15, stress:-5, time:30 }, res:{ t:'good', m:'정성껏 차린 한 끼가 하루를 응원한다.' } },
+    { id:'meditate', label:'🧘 짧은 명상 (10분)', type:'normal', ascii:'MENTOR',
+      eff:{ mental:10, stress:-5, time:10 }, res:{ t:'good', m:'마음을 차분히 가라앉혔다.' } }
+  ];
+  // 날씨가 안 좋으면 요리나 명상 확률 증가
+  var idx;
+  if (weather.id === 'rainy' || weather.id === 'snowy') {
+    idx = Math.random() > 0.5 ? 3 : 4; 
+  } else {
+    idx = Math.floor(Math.random() * activities.length);
+  }
+  var a = activities[idx];
+  return {
+    choice: { label: a.label, type: a.type, effect: a.eff, result: [a.res], ascii: a.ascii }
+  };
+}
+
+var WILDCARD_POOL = [
+  { id:'bird_poop', title:'💩 이런 날벼락이!', loc:'🏢 길거리', ascii:'BIRD', desc:[{t:'bad', m:'하늘에서 무언가 툭... 아, 새똥이다.'}],
+    choices:[
+      { label:'▶ 운이 좋군! 복권을 사야겠다', type:'money', effect:{ special:'lotto', stress:5 }, result:[{t:'story', m:'새똥은 행운의 상징이라던데?'}], ascii:'LOTTERY' },
+      { label:'▶ 으악! 최악이다...', type:'bad', effect:{ stress:15, mental:-10 }, result:[{t:'bad', m:'옷을 닦느라 진땀을 뺐다.'}] }
+    ]
+  },
+  { id:'found_coin', title:'🪙 반짝이는 무언가', loc:'🏢 길거리', ascii:'COIN', desc:[{t:'story', m:'바닥에 동전 하나가 떨어져 있다.'}],
+    choices:[
+      { label:'▶ 냉큼 주머니에 넣는다', type:'money', effect:{ money:500, mental:2 }, result:[{t:'good', m:'500원 득템! 소소한 기쁨.'}] },
+      { label:'▶ 주인에게 돌려줄까? (상상만)', type:'normal', effect:{ mental:5 }, result:[{t:'inner', m:'착한 일을 했다는 착각으로 멘탈 회복.'}] }
+    ]
+  }
+];

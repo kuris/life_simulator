@@ -176,7 +176,7 @@ function showScreen(id) {
 
 function log(id, type, msg) {
   var container = document.getElementById(id);
-  if (!container) return;
+  if (!container) return null;
   var d = document.createElement('div');
   if (type === 'divider') {
     d.className = 'log-line divider';
@@ -194,7 +194,12 @@ function log(id, type, msg) {
     }
   }
   container.appendChild(d);
-  requestAnimationFrame(function() { container.scrollTop = container.scrollHeight; });
+  requestAnimationFrame(function() {
+    if (id === 'game-log' && !G._focusing) {
+      container.scrollTop = container.scrollHeight;
+    }
+  });
+  return d;
 }
 
 function logWithType(el, type, msg) {
@@ -1267,12 +1272,26 @@ function nextEvent() {
     setTimeout(function() { SFX.play('alarm'); }, 200);
   }
 
-  log('game-log', 'divider', '');
+  G._focusing = true;
+  var startLine = log('game-log', 'divider', '');
   if (ev.ascii) log('game-log', 'ascii', ev.ascii);
-  ev.desc.forEach(function(l) { log('game-log', l.t, l.m); });
+
+  if (ev.desc) {
+    ev.desc.forEach(function(l) { log('game-log', l.t, l.m); });
+  }
+
   log('game-log', 'empty', '');
   renderChoices(ev.choices || []);
   updateSide();
+
+  // 스마트 포커스 스크롤: 지문의 시작점(startLine)으로 스크롤 고정
+  setTimeout(function() {
+    var container = document.getElementById('game-log');
+    if (container && startLine) {
+      container.scrollTop = startLine.offsetTop - 10;
+    }
+    G._focusing = false;
+  }, 100);
 }
 
 // ─── 역사적 이벤트 발동 ─────────────────────────────
@@ -1297,7 +1316,9 @@ function fireHistoricEvent() {
   if (locEl) locEl.textContent = '⚡ 역사적 사건 발생!';
 
   log('game-log', 'divider', '');
-  he.log.forEach(function(l) { log('game-log', l.t, l.m); });
+  if (he.log) {
+    he.log.forEach(function(l) { log('game-log', l.t, l.m); });
+  }
   log('game-log', 'empty', '');
   renderChoices(he.choices || []);
   updateSide();
@@ -1394,6 +1415,9 @@ function applyChoice(choice) {
     });
   }
 
+  if (choice.ascii && ASCII[choice.ascii]) {
+    log('game-log', 'ascii', ASCII[choice.ascii]);
+  }
   (choice.result || []).forEach(function(r) { log('game-log', r.t, r.m); });
 
   // 위험 스탯 경보음
@@ -1409,12 +1433,29 @@ function applyChoice(choice) {
 
   updateSide();
   saveGame();   // 매 선택 후 자동저장
-  setTimeout(nextEvent, 750);
+
+  // ── 성찰 시스템 (80% 확률) ────────────────
+  if (Math.random() < 0.8) {
+    var thought = getReflection(choice.type || 'normal');
+    setTimeout(function() {
+      var logEl = log('game-log', 'phil-thought', '✨ 성찰: "' + thought + '"');
+      if (logEl) logEl.scrollIntoView({ behavior:'smooth', block:'center' });
+    }, 450);
+  }
+
+  setTimeout(nextEvent, 1000); // 딜레이를 약간 늘려 성찰을 읽을 시간을 확보
 }
 
 // ─── 특수 이벤트 처리 ──────────────────────────────
 function handleSpecial(type) {
   var s = G.stats;
+  
+  if (type.indexOf('minigame:') === 0) {
+    var gameId = type.split(':')[1];
+    setTimeout(function() { startMiniGame(gameId); }, 300);
+    return;
+  }
+
   if (type === 'lotto') {
     var r = Math.random();
     var msg, money = 0;
@@ -1442,6 +1483,34 @@ function handleSpecial(type) {
       amt >= 50000 ? '제법 괜찮은 수익이다!' : '아직 소소하지만 꾸준히 하면 늘겠지.');
     if (typeof SFX !== 'undefined') setTimeout(function(){ SFX.play('money'); }, 300);
     s.income += amt;
+    updateSide();
+    setTimeout(nextEvent, 1000);
+  }
+}
+
+// ─── 미니게임 시스템 ──────────────────────────────
+function startMiniGame(id) {
+  if (id === 'typing') {
+    var words = ['SURVIVAL', 'KOREA', 'SUCCESS', 'EFFORT', 'PASSION', 'ROUTINE', 'SALARY', 'FREEDOM'];
+    var target = words[Math.floor(Math.random() * words.length)];
+    
+    // UI에 시스템 메시지 표시
+    log('game-log', 'system-msg', '⌨️ TYPING MISSION');
+    log('game-log', 'system', '제한 시간 내에 [' + target + ']를 입력하세요!');
+    
+    // 간단한 프롬프트로 구현 (나중에 전용 UI로 고도화 가능)
+    var start = Date.now();
+    var input = prompt('명령어를 입력하세요: ' + target);
+    var duration = (Date.now() - start) / 1000;
+    
+    if (input && input.toUpperCase() === target && duration < 7) {
+      log('game-log', 'good', '✅ 성취! 업무 집중력 상향. (스트레스 -15)');
+      G.stats.stress = Math.max(0, G.stats.stress - 15);
+      G.stats.mental = Math.min(100, G.stats.mental + 10);
+    } else {
+      log('game-log', 'bad', '❌ 지연... 흐름이 끊겼습니다. (스트레스 +10)');
+      G.stats.stress = Math.min(100, G.stats.stress + 10);
+    }
     updateSide();
     setTimeout(nextEvent, 1000);
   }
