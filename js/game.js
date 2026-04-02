@@ -1896,11 +1896,20 @@ function mapCsvToScenarios(rows) {
   console.log('Mapped Indices:', idx);
 
   for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    if (r.length < 3) continue;
+    let r = rows[i];
+    if (!r || r.length === 0) continue;
 
     try {
-      if (r[0].includes('\n') && r.length < 5) {
+      // [복구 모드] 데이터가 큰따옴표에 싸여 한 칸에 다 들어간 경우 (자주 발생하는 패턴)
+      if (r.length < 5 && r[0] && r[0].includes(',')) {
+        const recovered = parseCSV(r[0]);
+        if (recovered.length > 0 && recovered[0].length >= 5) {
+           r = recovered[0];
+        }
+      }
+
+      // 비정상적으로 뭉친 데이터 대응 (개행 포함 시)
+      if (r[0] && r[0].includes('\n') && r.length < 5) {
         const subRows = parseCSV(r[0]);
         subRows.forEach(sr => {
           const s = mapSingleScenario(sr, idx);
