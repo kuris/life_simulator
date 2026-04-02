@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>대한민국 직장인 생존기</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body class="era-2026">
+<div id="app">
+
+  <!-- ★ 타이틀 -->
+  <div id="screen-title" class="screen active">
+    <div class="center-wrap">
+      <div class="terminal-box">
+        <div class="blink-top">█</div>
+        <div class="title-badge">대한민국 직장인 생존기</div>
+        <div class="title-sub-main">내가 직접 살아보는 근현대사</div>
+
+        <div class="title-era-grid">
+          <div class="title-era-card" data-era="1980">
+            <div class="tec-icon">📻</div>
+            <div class="tec-year">1980년대</div>
+            <div class="tec-fate">버티면 집을 살 수 있는 시대</div>
+            <div class="tec-diff">★★★★☆ 체력</div>
+          </div>
+          <div class="title-era-card" data-era="1997">
+            <div class="tec-icon">💥</div>
+            <div class="tec-year">1997 IMF</div>
+            <div class="tec-fate">한순간에 무너질 수 있는 시대</div>
+            <div class="tec-diff">★★★★★ 최고난이도</div>
+          </div>
+          <div class="title-era-card" data-era="2000">
+            <div class="tec-icon">💻</div>
+            <div class="tec-year">2000년대</div>
+            <div class="tec-fate">도전하면 대박, 망설이면 월급쟁이</div>
+            <div class="tec-diff">★★★☆☆ 표준</div>
+          </div>
+          <div class="title-era-card" data-era="2010">
+            <div class="tec-icon">📱</div>
+            <div class="tec-year">2010년대</div>
+            <div class="tec-fate">연결된 세상에서 퇴근은 없다</div>
+            <div class="tec-diff">★★★★☆ 멘탈</div>
+          </div>
+          <div class="title-era-card" data-era="2020">
+            <div class="tec-icon">🦠</div>
+            <div class="tec-year">2020 코로나</div>
+            <div class="tec-fate">살아남는 방식이 바뀌는 시대</div>
+            <div class="tec-diff">★★★★☆ 스트레스</div>
+          </div>
+          <div class="title-era-card rec" data-era="2026">
+            <div class="tec-rec-badge">🟩 첫 플레이 추천</div>
+            <div class="tec-icon">🤖</div>
+            <div class="tec-year">2026 AI시대</div>
+            <div class="tec-fate">AI에 적응하거나, 도태되거나</div>
+            <div class="tec-diff">★★★☆☆ 균형</div>
+          </div>
+        </div>
+
+        <button class="btn-main" onclick="goToProfile()">▶ 나만의 캐릭터로 시작하기</button>
+        <div class="title-footer">※ 이 게임은 대한민국 근현대사를 배경으로 한 텍스트 생존 시뮬레이터입니다</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ★ 프로필 입력 (나이 + 성별) -->
+  <div id="screen-profile" class="screen">
+    <div class="center-wrap">
+      <div class="terminal-box">
+        <div class="sec-header">[ 당신은 누구입니까? ]</div>
+
+        <!-- 성별 선택 -->
+        <div class="profile-section">
+          <div class="profile-label">01. 성별을 선택하세요</div>
+          <div class="gender-row">
+            <button class="gender-btn" id="btn-male" onclick="selectGender('male')">
+              <span class="gender-icon">👨</span>
+              <span class="gender-txt">남성</span>
+            </button>
+            <button class="gender-btn" id="btn-female" onclick="selectGender('female')">
+              <span class="gender-icon">👩</span>
+              <span class="gender-txt">여성</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 나이 입력 -->
+        <div class="profile-section">
+          <div class="profile-label">02. 현재 나이를 입력하세요 <span class="profile-label-sub">(선택 — 비우면 직접 시대를 고릅니다)</span></div>
+          <div class="age-input-wrap">
+            <input type="number" id="age-input" class="age-input" min="15" max="80"
+              placeholder="예) 25" oninput="onAgeInput(this.value)"
+              onkeydown="if(event.key==='Enter'){ var ab=document.getElementById('btn-auto-era'); if(ab.style.display!=='none') confirmProfileAndAuto(); else confirmProfileAndPick(); }"/>
+            <span class="age-unit">세</span>
+          </div>
+          <!-- 나이 입력 시 자동 추천 결과 -->
+          <div id="age-recommend-box" class="age-recommend-box" style="display:none"></div>
+        </div>
+
+        <!-- 이름 입력 -->
+        <div class="profile-section">
+          <div class="profile-label">03. 이름 (닉네임) <span class="profile-label-sub">(선택)</span></div>
+          <div class="age-input-wrap">
+            <input type="text" id="name-input" class="age-input name-input" maxlength="8"
+              placeholder="예) 김철수" style="width:160px"/>
+          </div>
+        </div>
+
+        <!-- 액션 버튼 -->
+        <div class="profile-actions">
+          <button class="btn-main" id="btn-auto-era" onclick="confirmProfileAndAuto()" style="display:none">
+            🎯 추천 시대로 바로 시작!
+          </button>
+          <button class="btn-sub" id="btn-pick-era" onclick="confirmProfileAndPick()">
+            🗂 내가 시대를 직접 고를게요
+          </button>
+        </div>
+
+        <div class="profile-back" onclick="showScreen('title')">← 타이틀로 돌아가기</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ★ 시대 선택 -->
+  <div id="screen-era" class="screen">
+    <div class="center-wrap">
+      <div class="terminal-box">
+        <div class="sec-header">[ 시대 선택 ]</div>
+        <div class="era-select-intro">
+          어느 시대를 살아가겠습니까?<br>
+          <span style="font-size:11px;color:var(--dim)">선택 = 고민 = 몰입 — 당신의 인생이 달라집니다</span>
+        </div>
+        <div class="era-select-hint">👆 카드를 클릭하면 <strong>상세 정보</strong> &amp; <strong>예상 인생</strong>이 펼쳐집니다</div>
+        <div id="era-list" class="era-select-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ★ 캐릭터 생성 -->
+  <div id="screen-create" class="screen">
+    <div class="center-wrap">
+      <div class="terminal-box">
+        <div class="sec-header" id="create-era-badge">[ 캐릭터 생성 ]</div>
+        <div id="create-log" class="game-log" style="max-height:52vh;flex:1;min-height:0;"></div>
+        <div id="create-choices" class="choices-area" style="max-height:38vh;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ★ 메인 게임 -->
+  <div id="screen-game" class="screen">
+    <div class="game-layout">
+
+      <!-- 왼쪽: 메인 -->
+      <div class="main-panel terminal-box">
+        <div class="game-topbar">
+          <span class="era-chip" id="game-era-chip">2026</span>
+          <span class="loc-chip" id="game-loc">집 — 침실</span>
+        </div>
+        <div id="game-log" class="game-log"></div>
+        <div id="game-choices" class="choices-area"></div>
+      </div>
+
+      <!-- 오른쪽: 사이드 -->
+      <div class="side-col">
+
+        <!-- 플레이어 정보 -->
+        <div class="side-card side-player-card">
+          <div id="side-player-info" class="side-player-info">👤 —</div>
+          <div class="side-time" id="side-time">06:30</div>
+          <div class="side-date" id="side-date">—</div>
+        </div>
+
+        <div class="side-card">
+          <div class="side-card-title">[ 상태 ]</div>
+          <div class="stat-row"><span class="stat-lbl">체력</span>
+            <div class="bar-wrap"><div class="bar-fill bar-green" id="bar-stamina" style="width:100%"></div></div>
+            <span class="stat-num" id="num-stamina">100</span></div>
+          <div class="stat-row"><span class="stat-lbl">스트레스</span>
+            <div class="bar-wrap"><div class="bar-fill bar-yellow" id="bar-stress" style="width:0%"></div></div>
+            <span class="stat-num" id="num-stress">0</span></div>
+          <div class="stat-row"><span class="stat-lbl">멘탈</span>
+            <div class="bar-wrap"><div class="bar-fill bar-blue" id="bar-mental" style="width:100%"></div></div>
+            <span class="stat-num" id="num-mental">100</span></div>
+        </div>
+
+        <div class="side-card">
+          <div class="side-card-title">[ 재정 ]</div>
+          <div class="money-line income"><span>수입</span><span id="s-income">0원</span></div>
+          <div class="money-line expense"><span>지출</span><span id="s-expense">0원</span></div>
+          <div class="money-line net"><span>순수익</span><span id="s-net">0원</span></div>
+          <div class="money-line" style="margin-top:4px;color:var(--dim);font-size:10px">
+            <span>이번달 물가</span><span id="s-era-price">—</span>
+          </div>
+        </div>
+
+        <div class="side-card" id="side-family">
+          <div class="side-card-title">[ 가족 ]</div>
+          <div id="family-stats">
+            <div style="color:var(--dim);font-size:11px">솔로</div>
+          </div>
+        </div>
+
+        <div class="side-card">
+          <div class="side-card-title">[ 집안일 ]</div>
+          <div id="side-chores"><div style="color:var(--dim);font-size:11px">없음</div></div>
+        </div>
+
+        <div class="side-card" id="side-history" style="display:none">
+          <div class="side-card-title" style="color:#ff4444">[ ⚡ 역사적 사건 ]</div>
+          <div id="history-text" style="font-size:11px;color:#ffaa44;line-height:1.6"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ★ 엔딩 -->
+  <div id="screen-ending" class="screen">
+    <div class="center-wrap">
+      <div class="terminal-box">
+        <div class="sec-header">[ 인생 결산 ]</div>
+        <div id="ending-log" class="game-log" style="max-height:28vh;"></div>
+        <div id="ending-board" class="score-board"></div>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <button class="btn-main" style="flex:1" onclick="resetGame()">↺ 다시 살아보기</button>
+          <button class="btn-sub" style="flex:1" onclick="goToEraSelect()">⏱ 다른 시대 도전</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="js/eras.js"></script>
+<script src="js/events.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
