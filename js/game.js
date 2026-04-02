@@ -1807,7 +1807,8 @@ function resetGame() {
 }
 
 async function fetchScenarios() {
-  const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKtdfy3_tkODOglBzC85k8cXPAn6uDT8NdLOLOqzs-dXTOH16EmwANUoE0DA4Ykkz9C8Umsp-w0qUx/pub?output=csv';
+  const SHEET_ID = '1MBSZEGp5t3QQz7a7L7BLah1IN425Tu2KiIPoZhtiByU';
+  const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
   try {
     const res = await fetch(SHEET_URL);
     const csvText = await res.text();
