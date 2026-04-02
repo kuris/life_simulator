@@ -661,6 +661,18 @@ body::after {
 .log-line.relation{ color: var(--family); }
 .log-line.divider { border-top: 1px dashed var(--border); margin: 6px 0; }
 .log-line.empty   { height: 6px; }
+.log-line.ascii {
+  white-space: pre;
+  font-family: 'Courier New', monospace;
+  line-height: 1.1;
+  font-size: clamp(8px, 1.5vw, 11px);
+  color: var(--primary);
+  margin: 10px 0;
+  opacity: 0.85;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.log-line.ascii::-webkit-scrollbar { display: none; }
 
 /* ── 메인 게임 화면 ───────────────────── */
 #screen-game {

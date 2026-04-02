@@ -34,7 +34,7 @@ function buildDayEvents(profile, era) {
       result:[{ t:'bad', m:'지각할 것 같다. 택시를 잡았다. (-' + (econ.bus*10).toLocaleString() + '원)' }] },
   ];
 
-  ev.push({ id:'wake', time:'06:30', loc:'🏠 집 — 침실', desc:wakeDesc, choices:wakeChoices });
+  ev.push({ id:'wake', time:'06:30', loc:'🏠 집 — 침실', ascii: ASCII.WAKE, desc:wakeDesc, choices:wakeChoices });
 
   // ── 02. 아침 준비 ────────────────────────────
   var morningDesc = [
@@ -115,7 +115,7 @@ function buildDayEvents(profile, era) {
         result:[{ t:'good', m:'정신적 여유를 챙겼다.' }] });
     }
 
-    ev.push({ id:'commute', time:'07:40', loc:'🚇 출근길 (' + commuteMin + '분)', desc:commuteDesc, choices:commuteChoices });
+    ev.push({ id:'commute', time:'07:40', loc:'🚇 출근길 (' + commuteMin + '분)', ascii: ASCII.COMMUTE, desc:commuteDesc, choices:commuteChoices });
   } else {
     var remoteDesc = [
       { t:'time',  m:'[ 09:00 AM ] 재택근무 시작.' },
@@ -205,6 +205,16 @@ function buildDayEvents(profile, era) {
       desc:[ { t:'time', m:'[ 08:10 AM ] 출근길 돌발 상황!' } ].concat(picked.desc),
       choices: picked.choices
     });
+
+    // [New] Philosophical Moment - Morning Commute
+    var philMorning = getPhilosophicalMoment(p, e, 'morning');
+    if (philMorning) {
+      ev.push({
+        id:'phil_morning', time:'08:30', loc:'💭 이동 중 — 생각',
+        desc:[ { t:'time', m:'[ 08:30 AM ] 잠시 생각이 든다.' } ].concat(philMorning.descLines),
+        choices: philMorning.choices
+      });
+    }
   }
 
   // ── 05. 오전 업무 ────────────────────────────
@@ -256,7 +266,7 @@ function buildDayEvents(profile, era) {
       result:[{ t:'good', m:'AI 자동화 세팅 완료. 다음 주 업무가 줄어들 것이다.' }] });
   }
 
-  ev.push({ id:'morning_work', time:'09:00', loc:'💼 ' + p.company.label, desc:workDesc, choices:workChoices });
+  ev.push({ id:'morning_work', time:'09:00', loc:'💼 ' + p.company.label, ascii: ASCII.OFFICE, desc:workDesc, choices:workChoices });
 
   // ── 06. 오전 랜덤 이벤트 (시대별) ────────────────
   var morningPool = getMorningPool(p, e);
@@ -319,6 +329,16 @@ function buildDayEvents(profile, era) {
   }
 
   ev.push({ id:'lunch', time:'12:00', loc:'🍱 점심 시간', desc:lunchDesc, choices:lunchChoices });
+
+  // [New] Philosophical Moment - Lunchtime
+  var philLunch = getPhilosophicalMoment(p, e, 'lunch');
+  if (philLunch) {
+    ev.push({
+      id:'phil_lunch', time:'13:00', loc:'💭 식후 — 고찰',
+      desc:[ { t:'time', m:'[ 01:00 PM ] 식사를 마치고 짧은 생각.' } ].concat(philLunch.descLines),
+      choices: philLunch.choices
+    });
+  }
 
   // ── 08. 오후 업무 ────────────────────────────
   var pmDesc = [
@@ -480,7 +500,7 @@ function buildDayEvents(profile, era) {
       ] },
   ];
 
-  ev.push({ id:'chores', time:'19:30', loc:'🏠 집 — 귀가 후', desc:choresDesc, choices:choresChoices });
+  ev.push({ id:'chores', time:'19:30', loc:'🏠 집 — 귀가 후', ascii: ASCII.CHORES, desc:choresDesc, choices:choresChoices });
 
   // ── 13. 가족 이벤트 ──────────────────────────
   var familyPool = getFamilyPool(p, e);
@@ -499,8 +519,17 @@ function buildDayEvents(profile, era) {
     var ie = incomePool[Math.floor(Math.random()*incomePool.length)];
     ev.push({
       id:'income', time:'21:00', loc:'📱 저녁 — 수익/부업',
-      desc:[ { t:'time', m:'[ 09:00 PM ] 저녁, 폰을 열었다.' }, { t:'event', m:'💸 ' + ie.title } ].concat(ie.descLines),
       choices: ie.choices
+    });
+  }
+
+  // [New] Philosophical Moment - Evening
+  var philEvening = getPhilosophicalMoment(p, e, 'evening');
+  if (philEvening) {
+    ev.push({
+      id:'phil_evening', time:'21:30', loc:'💭 밤 — 깊은 생각',
+      desc:[ { t:'time', m:'[ 09:30 PM ] 하루를 마무리하며...' } ].concat(philEvening.descLines),
+      choices: philEvening.choices
     });
   }
 
@@ -557,7 +586,7 @@ function buildDayEvents(profile, era) {
       result:[{ t:'good', m:'AI가 내일 스케줄을 최적화해줬다.' }] });
   }
 
-  ev.push({ id:'night', time:'22:00', loc:'🏠 취침 전', desc:[
+  ev.push({ id:'night', time:'22:00', loc:'🏠 취침 전', ascii: ASCII.NIGHT, desc:[
     { t:'time',  m:'[ 10:00 PM ] 하루가 끝나간다.' },
     { t:'story', m:'오늘 하루를 어떻게 마무리할까?' },
   ], choices:nightChoices });

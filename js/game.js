@@ -172,6 +172,11 @@ function log(id, type, msg) {
     d.className = 'log-line divider';
   } else if (type === 'empty') {
     d.className = 'log-line empty';
+  } else if (type === 'ascii') {
+    d.className = 'log-line ascii';
+    if (msg) {
+      logAscii(d, msg);
+    }
   } else {
     d.className = 'log-line ' + type;
     if (msg) {
@@ -201,6 +206,22 @@ function logWithType(el, type, msg) {
         else if (type === 'relation') SFX.play('relationUp');
         else if (type === 'history') SFX.play('historic');
       }
+    }
+  }
+  setTimeout(tick, 0);
+}
+
+function logAscii(el, msg) {
+  // 아스키 아트는 한 줄씩 출력 (시각적 일관성)
+  var lines = msg.split('\n');
+  var i = 0;
+  var speed = 40;
+  function tick() {
+    if (i < lines.length) {
+      el.textContent += lines[i] + '\n';
+      if (typeof SFX !== 'undefined') SFX.onTypeChar();
+      i++;
+      setTimeout(tick, speed);
     }
   }
   setTimeout(tick, 0);
@@ -1235,6 +1256,7 @@ function nextEvent() {
   }
 
   log('game-log', 'divider', '');
+  if (ev.ascii) log('game-log', 'ascii', ev.ascii);
   ev.desc.forEach(function(l) { log('game-log', l.t, l.m); });
   log('game-log', 'empty', '');
   renderChoices(ev.choices || []);
@@ -1589,12 +1611,84 @@ function showEnding() {
     '<div class="score-row"><span>지출</span><span style="color:#ff6644">-' + s.expense.toLocaleString() + '원</span></div>' +
     '<div class="score-row hl"><span>순수익</span><span style="color:' + (net >= 0 ? 'var(--accent)' : '#ff4444') + '">' + (net >= 0 ? '+' : '') + net.toLocaleString() + '원</span></div>' +
     choreHtml + familyHtml + bonusHtml +
+    getPhilosophySection(p.flags) +
     '<div class="ending-rank-wrap">' +
       '<div class="ending-grade-badge" style="background:' + gradeInfo.color + '">' + gradeInfo.grade + '</div>' +
       '<div class="ending-score-num" style="color:var(--primary)">' + score + '점</div>' +
       '<div class="ending-grade" style="color:' + ending.color + '">' + ending.label + '</div>' +
       '<div class="ending-msg">' + ending.msg + '</div>' +
     '</div>';
+}
+
+function getPhilosophySection(flags) {
+  var counts = {
+    Phil_Stoic: 0,
+    Phil_Epicurean: 0,
+    Phil_Altruist: 0,
+    Phil_Materialist: 0,
+    Phil_Existentialist: 0,
+    Phil_Humanist: 0
+  };
+
+  var hasPhil = false;
+  flags.forEach(function(f) {
+    if (counts.hasOwnProperty(f)) {
+      counts[f]++;
+      hasPhil = true;
+    }
+  });
+
+  if (!hasPhil) return '';
+
+  var maxVal = 0;
+  var dominant = 'Phil_Stoic';
+  for (var k in counts) {
+    if (counts[k] > maxVal) {
+      maxVal = counts[k];
+      dominant = k;
+    }
+  }
+
+  var philData = {
+    Phil_Stoic: {
+      title: '현대판 스토아 학자',
+      desc: '당신은 통제할 수 없는 고통에 의연히 대처하며, 묵묵히 자신의 자리를 지키는 인내의 미덕을 보였습니다.',
+      icon: '🛡️'
+    },
+    Phil_Epicurean: {
+      title: '세속의 정원사',
+      desc: '당신은 오늘이라는 찰나의 순간에서 기쁨을 찾고, 불필요한 고통보다는 마음의 평온과 즐거움을 우선시했습니다.',
+      icon: '🍷'
+    },
+    Phil_Altruist: {
+      title: '따스한 등불',
+      desc: '자신의 안위보다 타인의 웃음과 행복에서 삶의 의미를 찾는 당신은, 누군가의 어둠을 밝혀주는 존재입니다.',
+      icon: '🕯️'
+    },
+    Phil_Materialist: {
+      title: '현실적인 전략가',
+      desc: '추상적인 가치보다 눈에 보이는 성취와 자산을 소중히 여기며, 더 나은 내일을 위해 확실한 발판을 다졌습니다.',
+      icon: '💰'
+    },
+    Phil_Existentialist: {
+      title: '의미를 빚는 조각가',
+      desc: '주어진 운명에 순응하기보다, 치열한 고민을 통해 스스로 삶의 이유를 만들어가려는 주체적인 태도를 보였습니다.',
+      icon: '🎭'
+    },
+    Phil_Humanist: {
+      title: '길 위의 동행자',
+      desc: '사람과 사람 사이의 온기와 유대감을 소중히 여기며, 함께 살아간다는 것의 가치를 다시금 일깨워주었습니다.',
+      icon: '🤝'
+    }
+  };
+
+  var data = philData[dominant];
+
+  return '<div class="score-sec">[ 인생의 의미 ]</div>' +
+         '<div class="phil-card" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:12px; margin-top:5px;">' +
+           '<div style="font-size:14px; color:var(--primary); font-weight:700; margin-bottom:4px;">' + data.icon + ' ' + data.title + '</div>' +
+           '<div style="font-size:11px; color:var(--text); line-height:1.5; opacity:0.8;">' + data.desc + '</div>' +
+         '</div>';
 }
 
 function getGrade(score) {
