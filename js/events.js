@@ -26,13 +26,13 @@ function buildDayEvents(profile, era) {
 
   var wakeChoices = [
     { label:'▶ 바로 일어난다 (칼기상)', type:'normal',
-      effect:{ stress:-3 },
-      result:[{ t:'good', m:'의지력! 상쾌하게 하루 시작.' }] },
+      effect: Object.assign({ stress:-3 }, weather.eff),
+      result:[{ t:'good', m:'의지력! 상쾌하게 하루 시작. (' + weather.label + ' 날씨의 영향)' }] },
     { label:'▶ 10분만 더... (스누즈)', type:'normal',
-      effect:{ stamina:5, time:10 },
+      effect: Object.assign({ stamina:5, time:10 }, weather.eff),
       result:[{ t:'story', m:'10분이 지나 겨우 일어났다.' }] },
     { label:'▶ 30분 더 잔다 (택시비 각오)', type:'bad',
-      effect:{ stamina:10, stress:8, time:30, money:-(econ.bus*10) },
+      effect: Object.assign({ stamina:10, stress:8, time:30, money:-(econ.bus*10) }, weather.eff),
       result:[{ t:'bad', m:'지각할 것 같다. 택시를 잡았다. (-' + (econ.bus*10).toLocaleString() + '원)' }] },
   ];
 
