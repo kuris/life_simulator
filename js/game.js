@@ -47,6 +47,7 @@ function showScreen(id) {
   }
   var el = document.getElementById('screen-' + id);
   if (el) el.classList.add('active');
+  if (typeof SFX !== 'undefined') SFX.play('screenTransition');
 }
 
 function log(id, type, msg) {
@@ -59,10 +60,36 @@ function log(id, type, msg) {
     d.className = 'log-line empty';
   } else {
     d.className = 'log-line ' + type;
-    d.textContent = msg || '';
+    if (msg) {
+      logWithType(d, type, msg);
+    }
   }
   container.appendChild(d);
   requestAnimationFrame(function() { container.scrollTop = container.scrollHeight; });
+}
+
+function logWithType(el, type, msg) {
+  // 타이핑 효과로 텍스트 출력 + 소리
+  var i = 0;
+  var speed = 22;
+  function tick() {
+    if (i < msg.length) {
+      el.textContent += msg[i];
+      if (typeof SFX !== 'undefined') SFX.onTypeChar();
+      i++;
+      setTimeout(tick, speed);
+    } else {
+      // 줄 완성 시 타입별 효과음
+      if (typeof SFX !== 'undefined') {
+        if (type === 'good') SFX.play('good');
+        else if (type === 'bad') SFX.play('bad');
+        else if (type === 'money') SFX.play('money');
+        else if (type === 'relation') SFX.play('relationUp');
+        else if (type === 'history') SFX.play('historic');
+      }
+    }
+  }
+  setTimeout(tick, 0);
 }
 
 function clearEl(id) {
@@ -75,7 +102,13 @@ function mkBtn(html, onClick, extra) {
   var b = document.createElement('button');
   b.className = 'btn-choice ' + extra;
   b.innerHTML = html;
-  b.onclick = onClick;
+  b.addEventListener('mouseenter', function() {
+    if (typeof SFX !== 'undefined') SFX.play('hover');
+  });
+  b.onclick = function() {
+    if (typeof SFX !== 'undefined') SFX.play('click');
+    onClick();
+  };
   return b;
 }
 
@@ -99,6 +132,7 @@ var ERA_AGE_MAP = [
 ];
 
 function goToProfile() {
+  if (typeof SFX !== 'undefined') SFX.play('click');
   showScreen('profile');
   // 성별 버튼 초기화
   document.getElementById('btn-male').classList.remove('selected');
@@ -439,6 +473,7 @@ function typeText(el, text, speed, initialDelay, callback, append) {
   function tick() {
     if (i < text.length) {
       span.textContent += text[i];
+      if (typeof SFX !== 'undefined') SFX.onTypeChar();
       i++;
       setTimeout(tick, speed);
     } else {
@@ -648,7 +683,11 @@ function advCreate() {
   step.logs.forEach(function(l) { log('create-log', l.t, l.m); });
   log('create-log', 'empty', '');
   clearEl('create-choices');
-  step.render(function() { cIdx++; setTimeout(advCreate, 350); });
+  step.render(function() {
+    if (typeof SFX !== 'undefined') SFX.play('click');
+    cIdx++;
+    setTimeout(advCreate, 350);
+  });
 }
 
 function finishCreate() {
@@ -659,6 +698,8 @@ function finishCreate() {
   var baseIncome = (p.employType.id === 'fulltime' || p.employType.id === 'contract')
     ? Math.round(p.job.dailyPay) : 0;
   G.stats = { stress:0, stamina:100, mental:100, time:390, income:baseIncome, expense:0 };
+
+  if (typeof SFX !== 'undefined') setTimeout(function(){ SFX.play('createDone'); }, 200);
 
   log('create-log', 'divider', '');
   var gIcon = p.gender === 'female' ? '👩' : '👨';
@@ -695,6 +736,7 @@ function initGame() {
   G.events = buildDayEvents(G.profile, G.era);
 
   showScreen('game');
+  if (typeof SFX !== 'undefined') SFX.play('gameStart');
 
   var chip = document.getElementById('game-era-chip');
   if (chip) {
@@ -864,6 +906,11 @@ function nextEvent() {
   var locEl = document.getElementById('game-loc');
   if (locEl) locEl.textContent = ev.loc;
 
+  // 기상 이벤트 알람 효과
+  if (ev.id === 'wake' && typeof SFX !== 'undefined') {
+    setTimeout(function() { SFX.play('alarm'); }, 200);
+  }
+
   log('game-log', 'divider', '');
   ev.desc.forEach(function(l) { log('game-log', l.t, l.m); });
   log('game-log', 'empty', '');
@@ -881,6 +928,12 @@ function fireHistoricEvent() {
     htxt.textContent = he.title;
     hpanel.classList.add('history-flash');
     setTimeout(function() { hpanel.classList.remove('history-flash'); }, 2000);
+  }
+
+  // 역사적 이벤트 충격 사운드
+  if (typeof SFX !== 'undefined') {
+    SFX.play('shock');
+    setTimeout(function() { SFX.play('historic'); }, 400);
   }
 
   var locEl = document.getElementById('game-loc');
@@ -931,17 +984,44 @@ function applyChoice(choice) {
     return;
   }
 
+  var prevStress  = s.stress;
+  var prevStamina = s.stamina;
+  var prevMental  = s.mental;
+  var prevRelSp   = p.rel_spouse;
+  var prevRelKid  = p.rel_kid;
+
   if (eff.stress   != null) s.stress  = Math.max(0, Math.min(100, s.stress  + eff.stress));
   if (eff.stamina  != null) s.stamina = Math.max(0, Math.min(100, s.stamina + eff.stamina));
   if (eff.mental   != null) s.mental  = Math.max(0, Math.min(100, s.mental  + eff.mental));
   if (eff.time     != null) s.time   += eff.time;
   if (eff.money    != null) {
-    if (eff.money > 0) s.income  += eff.money;
-    else               s.expense += -eff.money;
+    if (eff.money > 0) {
+      s.income += eff.money;
+      if (typeof SFX !== 'undefined') setTimeout(function() { SFX.play('coin'); }, 300);
+    } else {
+      s.expense += -eff.money;
+    }
   }
-  if (eff.rel_sp  != null && p.hasSpouse) p.rel_spouse = Math.max(0, Math.min(100, p.rel_spouse + eff.rel_sp));
-  if (eff.rel_kid != null && p.hasKid)   p.rel_kid    = Math.max(0, Math.min(100, p.rel_kid    + eff.rel_kid));
+  if (eff.rel_sp  != null && p.hasSpouse) {
+    p.rel_spouse = Math.max(0, Math.min(100, p.rel_spouse + eff.rel_sp));
+    if (typeof SFX !== 'undefined') {
+      if (p.rel_spouse > prevRelSp) setTimeout(function(){ SFX.play('relationUp'); }, 500);
+      else if (p.rel_spouse < prevRelSp) setTimeout(function(){ SFX.play('relationDown'); }, 500);
+    }
+  }
+  if (eff.rel_kid != null && p.hasKid) {
+    p.rel_kid = Math.max(0, Math.min(100, p.rel_kid + eff.rel_kid));
+    if (typeof SFX !== 'undefined') {
+      if (p.rel_kid > prevRelKid) setTimeout(function(){ SFX.play('relationUp'); }, 600);
+      else if (p.rel_kid < prevRelKid) setTimeout(function(){ SFX.play('relationDown'); }, 600);
+    }
+  }
   if (eff.flag && p.flags.indexOf(eff.flag) < 0) p.flags.push(eff.flag);
+
+  // 야근 효과음
+  if (eff.flag === 'overtime' && typeof SFX !== 'undefined') {
+    setTimeout(function() { SFX.play('overtime'); }, 400);
+  }
 
   if (eff.choreDone) {
     eff.choreDone.forEach(function(id) {
@@ -958,6 +1038,13 @@ function applyChoice(choice) {
   }
 
   (choice.result || []).forEach(function(r) { log('game-log', r.t, r.m); });
+
+  // 위험 스탯 경보음
+  if (typeof SFX !== 'undefined') {
+    if (s.stress >= 85 && prevStress < 85) setTimeout(function(){ SFX.play('stressAlert'); }, 600);
+    if (s.stamina <= 15 && prevStamina > 15) setTimeout(function(){ SFX.play('bad'); }, 600);
+    if (s.mental <= 20 && prevMental > 20) setTimeout(function(){ SFX.play('bad'); }, 600);
+  }
 
   if (s.stress >= 85 && s.stress < 90) log('game-log', 'bad', '⚠ 스트레스가 위험 수준에 달했다!');
   if (s.stamina <= 15 && s.stamina > 10) log('game-log', 'bad', '⚠ 체력이 바닥났다. 쉬어야 한다.');
@@ -977,10 +1064,17 @@ function handleSpecial(type) {
     else if (r < 0.005)  { msg = '🎊 4등 당첨! 50,000원!'; money = 50000; }
     else if (r < 0.03)   { msg = '✨ 5등 당첨! 5,000원!'; money = 5000; }
     else                 { msg = '😭 꽝... 역시 로또는 꿈이었다.'; money = 0; }
+
+    // 로또 긴장감 사운드
+    if (typeof SFX !== 'undefined') {
+      if (money >= 50000) setTimeout(function(){ SFX.play('lotto'); }, 200);
+      else                setTimeout(function(){ SFX.play('lottoBad'); }, 200);
+    }
+
     log('game-log', money > 10000 ? 'good' : 'bad', msg);
     if (money > 0) s.income += money;
     updateSide();
-    setTimeout(nextEvent, 1000);
+    setTimeout(nextEvent, money >= 50000 ? 2500 : 1200);
 
   } else if (type === 'youtube') {
     var amounts = [800, 2500, 6000, 15000, 38000, 95000, 280000, 500000];
@@ -988,6 +1082,7 @@ function handleSpecial(type) {
     log('game-log', 'money', '📊 유튜브 수익: +' + amt.toLocaleString() + '원');
     log('game-log', amt >= 50000 ? 'good' : 'story',
       amt >= 50000 ? '제법 괜찮은 수익이다!' : '아직 소소하지만 꾸준히 하면 늘겠지.');
+    if (typeof SFX !== 'undefined') setTimeout(function(){ SFX.play('money'); }, 300);
     s.income += amt;
     updateSide();
     setTimeout(nextEvent, 1000);
@@ -997,6 +1092,7 @@ function handleSpecial(type) {
 // ─── 엔딩 ─────────────────────────────────────────
 function showEnding() {
   showScreen('ending');
+  if (typeof SFX !== 'undefined') setTimeout(function(){ SFX.play('ending'); }, 300);
   clearEl('ending-log');
 
   var s = G.stats;

@@ -58,7 +58,7 @@
           </div>
         </div>
 
-        <button class="btn-main" onclick="goToProfile()">▶ 나만의 캐릭터로 시작하기</button>
+        <button class="btn-main" onclick="if(typeof SFX!=='undefined')SFX.play('click'); goToProfile()">▶ 나만의 캐릭터로 시작하기</button>
         <div class="title-footer">※ 이 게임은 대한민국 근현대사를 배경으로 한 텍스트 생존 시뮬레이터입니다</div>
       </div>
     </div>
@@ -117,7 +117,7 @@
           </button>
         </div>
 
-        <div class="profile-back" onclick="showScreen('title')">← 타이틀로 돌아가기</div>
+        <div class="profile-back" onclick="if(typeof SFX!=='undefined')SFX.play('click'); showScreen('title')">← 타이틀로 돌아가기</div>
       </div>
     </div>
   </div>
@@ -232,6 +232,7 @@
   </div>
 
 </div>
+<script src="js/sound.js"></script>
 <script src="js/eras.js"></script>
 <script src="js/events.js"></script>
 <script src="js/game.js"></script>
