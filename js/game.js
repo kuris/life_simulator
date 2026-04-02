@@ -194,11 +194,15 @@ function log(id, type, msg) {
     }
   }
   container.appendChild(d);
-  requestAnimationFrame(function() {
-    if (id === 'game-log' && !G._focusing) {
+  if (id === 'game-log' && !G._focusing) {
+    requestAnimationFrame(function() {
       container.scrollTop = container.scrollHeight;
-    }
-  });
+      // 레이아웃이 완전히 잡힌 후 한 번 더 스크롤 (비동기 이미지/아트 대응)
+      requestAnimationFrame(function() {
+        container.scrollTop = container.scrollHeight;
+      });
+    });
+  }
   return d;
 }
 
@@ -219,7 +223,7 @@ function logWithType(el, type, msg) {
         else if (type === 'bad') SFX.play('bad');
         else if (type === 'money') SFX.play('money');
         else if (type === 'relation') SFX.play('relationUp');
-        else if (type === 'history') SFX.play('historic');
+        else if (type === 'history' || type === 'news') SFX.play('historic');
       }
     }
   }

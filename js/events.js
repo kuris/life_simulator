@@ -15,6 +15,9 @@ function buildDayEvents(profile, era) {
   var weather = getWeather();
   var weatherIcon = ASCII[weather.id.toUpperCase()] || ASCII.SUNNY;
 
+  // [New] Pick a Narrative Core for this playthrough
+  var core = getNarrativeCore(profile, era);
+
   // ── 01. 기상 ────────────────────────────────
   var wakeDesc = [
     { t:'time',  m:'[ 06:30 AM ] 알람이 울린다. (' + weather.label + ' 날씨)' },
@@ -121,6 +124,11 @@ function buildDayEvents(profile, era) {
       commuteChoices.push({ label:'▶ 이어폰 끼고 팟캐스트/음악 듣는다', type:'normal',
         effect:{ stress:commuteStress-4, stamina:commuteStamina, money:-transitCost, time:commuteMin },
         result:[{ t:'good', m:'정신적 여유를 챙겼다.' }] });
+    }
+
+    var news = getNews(eraId);
+    if (news) {
+      ev.push({ id:'morning_news', time:'07:40', loc:'📻 뉴스 속보', desc:[{ t:'news', m: news }] });
     }
 
     var commuteAscii = (eraId === '1980') ? ASCII.BUS : ASCII.COMMUTE;
@@ -382,6 +390,17 @@ function buildDayEvents(profile, era) {
 
   ev.push({ id:'afternoon_work', time:'14:00', loc:'💼 오후 업무', desc:pmDesc, choices:pmChoices });
 
+  // [Narrative Core Stage 1] — 14:30
+  if (core && core.stages[0]) {
+    var s1 = core.stages[0];
+    ev.push({
+      id:'narrative_1', time:'14:30', loc: s1.loc || '⚡ 오늘 하루의 균열',
+      desc:[ { t:'time', m:'[ 02:30 PM ] ' + s1.title } ].concat(s1.descLines),
+      choices: s1.choices,
+      ascii: s1.ascii
+    });
+  }
+
   // ── 09. 랜덤 돌발 이벤트 (Wildcard) ────────────────
   if (Math.random() < 0.2) { // 20% 확률로 돌발 상황
     var wildEv = WILDCARD_POOL[Math.floor(Math.random() * WILDCARD_POOL.length)];
@@ -396,6 +415,17 @@ function buildDayEvents(profile, era) {
       id:'afternoon_event', time:'16:00', loc:'⚡ 오후 돌발 이벤트',
       desc:[ { t:'time', m:'[ 04:00 PM ] 갑자기 일이 터졌다!' }, { t:'event', m:'⚡ ' + ae.title } ].concat(ae.descLines),
       choices: ae.choices
+    });
+  }
+
+  // [Narrative Core Stage 2] — 16:30
+  if (core && core.stages[1]) {
+    var s2 = core.stages[1];
+    ev.push({
+      id:'narrative_2', time:'16:30', loc: s2.loc || '⚡ 깊어가는 이야기',
+      desc:[ { t:'time', m:'[ 04:30 PM ] ' + s2.title } ].concat(s2.descLines),
+      choices: s2.choices,
+      ascii: s2.ascii
     });
   }
 
@@ -1264,4 +1294,186 @@ var WILDCARD_POOL = [
       { label:'▶ 주인에게 돌려줄까? (상상만)', type:'normal', effect:{ mental:5 }, result:[{t:'inner', m:'착한 일을 했다는 착각으로 멘탈 회복.'}] }
     ]
   }
-];
+];function getNarrativeCore(p, e) {
+  var pool = NARRATIVE_CORE_POOL[e.id] || [];
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+var NARRATIVE_CORE_POOL = {
+  '2026': [
+    {
+      id: 'ai_replacement',
+      stages: [
+        {
+          title: '오후의 균열',
+          loc: '🤝 팀장실',
+          descLines: [
+            { t:'story', m:'팀장이 조용히 회의실로 부른다.' },
+            { t:'npc', m:'팀장: "솔직히 말할게요. 이번에 들어온 AI 인턴이 김민지 씨 업무의 70%를 자동화해버렸어요."' },
+            { t:'bad', m:'침묵이 흐른다. 내 존재 가치가 데이터 한 줄로 부정당한 느낌이다.' }
+          ],
+          ascii: 'AI_CHART',
+          choices: [
+            { label:'▶ "그 AI 툴, 저도 가르쳐 주십시오"', type:'normal', effect:{ mental:5, flag:'ai_learner' }, result:[{ t:'good', m:'적응하려는 의지. 팀장이 고개를 끄덕인다.' }] },
+            { label:'▶ "...제가 부족했다는 말씀인가요?"', type:'bad', effect:{ stress:15, mental:-10 }, result:[{ t:'bad', m:'감정적인 대응. 공기가 차가워진다.' }] },
+            { label:'▶ 아무 말 없이 바닥만 본다', type:'normal', effect:{ stress:10 }, result:[{ t:'inner', m:'\'결국 올 것이 왔구나...\'' }] }
+          ]
+        },
+        {
+          title: '결정의 시간',
+          loc: '💼 내 책상',
+          descLines: [
+            { t:'story', m:'퇴근 전, 모니터에 AI 인턴이 작성한 보고서가 떠 있다.' },
+            { t:'story', m:'완벽하다. 인간의 감정이 배제된, 차갑지만 효율적인 결과물.' }
+          ],
+          choices: [
+            { label:'▶ AI의 성과를 인정하고 협업을 제안한다', type:'history', effect:{ mental:10, money:20000, flag:'ai_partner' }, result:[{ t:'good', m:'기술을 도구로 삼기로 했다. 새로운 기회가 보이기 시작한다.' }] },
+            { label:'▶ 내 방식대로 다시 고쳐 쓴다', type:'normal', effect:{ stress:20, stamina:-10 }, result:[{ t:'bad', m:'3시간을 더 써서 수동으로 고쳤다. 자존심은 지켰지만 지친다.' }] }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'crypto_ghost',
+      stages: [
+        {
+          title: '달콤한 유혹',
+          loc: '☕ 회사 로비',
+          descLines: [
+            { t:'npc', m:'퇴사한 전 동료: "아직도 거기 다녀? 나 코인으로 벌써 은퇴했어. 비법 알려줄까?"' },
+            { t:'story', m:'그가 보여준 계좌 잔고는 내 연봉의 10배다.' }
+          ],
+          choices: [
+            { label:'▶ 비법을 전수받는다', type:'money', effect:{ money:-1000000, flag:'crypto_gambler' }, result:[{ t:'money', m:'100만원을 입금했다. "거인의 어깨"에 올라탄 느낌이다.' }] },
+            { label:'▶ "운이 좋았네" 하고 거절한다', type:'normal', effect:{ mental:10 }, result:[{ t:'good', m:'성실한 노동의 가치를 믿기로 했다.' }] }
+          ]
+        },
+        {
+          title: '흔들리는 마음',
+          loc: '📱 퇴근길 지하철',
+          descLines: [
+            { t:'story', m:'동료가 추천한 코인이 실시간으로 폭등하고 있다는 알림이 온다.' }
+          ],
+          choices: [
+            { label:'▶ 지금이라도 추격 매수!', type:'bad', effect:{ money:-500000, stress:15, flag:'fomo' }, result:[{ t:'bad', m:'올라타자마자 하락하기 시작한다. 심장이 뛴다.' }] },
+            { label:'▶ 화면을 끄고 창밖을 본다', type:'normal', effect:{ mental:5 }, result:[{ t:'inner', m:'\'내 돈이 아니야...\'' }] }
+          ]
+        }
+      ]
+    }
+  ],
+  '1997': [
+    {
+      id: 'imf_layoff',
+      stages: [
+        {
+          title: '명단의 공포',
+          loc: '🏢 복도',
+          descLines: [
+            { t:'story', m:'인사팀 사무실 앞에 사람들이 모여 있다. 하얀 봉투가 오간다.' },
+            { t:'bad', m:'친했던 옆자리 오 차장이 고개를 떨구며 짐을 싼다.' }
+          ],
+          ascii: 'RESIGNATION',
+          choices: [
+            { label:'▶ 다가가 위로를 건넨다', type:'family', effect:{ stress:10, rel_sp:-2 }, result:[{ t:'story', m:'오 차장: "김 대리는 꼭 살아남게..." 그의 손이 떨린다.' }] },
+            { label:'▶ 못 본 척 내 자리로 돌아온다', type:'bad', effect:{ stress:15, mental:-5 }, result:[{ t:'inner', m:'\'어쩔 수 없어. 나부터 살아야 해.\'' }] }
+          ]
+        },
+        {
+          title: '살아남은 자의 슬픔',
+          loc: '💼 팀장실',
+          descLines: [
+            { t:'npc', m:'팀장: "김 대리, 자네는 이번엔 빠졌네. 하지만 조건이 있어. 당분간 무임금 야근이야."' }
+          ],
+          choices: [
+            { label:'▶ "감사합니다" 하고 수긍한다', type:'normal', effect:{ stamina:-20, stress:10, flag:'survivor' }, result:[{ t:'story', m:'살아남았다는 안도감과 비참함이 교차한다.' }] },
+            { label:'▶ "그건 너무합니다" 항의한다', type:'bad', effect:{ stress:25, flag:'protester' }, result:[{ t:'bad', m:'팀장: "지금 분위기 파악 안 돼?" 찍혀버렸다.' }] }
+          ]
+        }
+      ]
+    }
+  ],
+  '1980': [
+    {
+      id: 'export_miracle',
+      stages: [
+        {
+          title: '국가적 사명',
+          loc: '🏭 공장 라인',
+          descLines: [
+            { t:'npc', m:'반장: "이번 수출 물량 못 맞추면 나라 망신이야. 오늘부터 전원 합숙 특근이다!"' },
+            { t:'story', m:'산업 역군이라는 칭호 아래, 땀 냄새 가득한 야간 작업이 시작된다.' }
+          ],
+          ascii: 'CONTAINER',
+          choices: [
+            { label:'▶ "해보자!" 정신력으로 버틴다', type:'normal', effect:{ stamina:-25, mental:15, flag:'patriot_worker' }, result:[{ t:'good', m:'애국심이 솟구친다. 우리는 할 수 있다!' }] },
+            { label:'▶ 조용히 허리 통증을 참는다', type:'bad', effect:{ stamina:-30, stress:10 }, result:[{ t:'bad', m:'몸이 비명을 지르지만 멈출 수 없다.' }] }
+          ]
+        },
+        {
+          title: '기적의 아침',
+          loc: '🚚 하차장',
+          descLines: [
+            { t:'story', m:'밤샘 작업 끝에 컨테이너가 출발한다. 태극기를 단 트럭이 멀어진다.' }
+          ],
+          choices: [
+            { label:'▶ 뿌듯함에 젖어 담배 한 대', type:'normal', effect:{ stress:-15, money:-e.econ.cigarette }, result:[{ t:'good', m:'이게 나라를 세우는 맛이지.' }] },
+            { label:'▶ 그대로 바닥에 쓰러져 잠든다', type:'bad', effect:{ stamina:20, time:120 }, result:[{ t:'story', m:'기절하듯 잠들었다. 훈장보다 잠이 달콤하다.' }] }
+          ]
+        }
+      ]
+    }
+  ]
+};
+
+function getNews(eraId) {
+  var pool = NEWS_POOL[eraId] || [];
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+var NEWS_POOL = {
+  '1980': [
+    '서울 지하철 2호선 성수~교대 구간 개통! 강남 시대 열린다.',
+    '컬러 TV 방송 전격 실시, 전국이 천연색으로 물든다.',
+    '프로야구 6개 구단 창단 완료, 내년 시즌 개막 기대감 고조.',
+    '새마을 운동 전국적 확산... "우리도 한번 잘 살아보세"',
+    '낮 12시부터 1시까지 절전 위해 전 부처 소등 실시.'
+  ],
+  '1997': [
+    '정부, 결국 IMF 구제금융 신청 확정 "국가 부도 위기"',
+    '한보철강 부도... 대기업 연쇄 도산 우려에 시장 패닉.',
+    '금 모으기 운동 본부 발족 "장롱 속 돌반지를 나라를 위해"',
+    '원-달러 환율 2,000원 돌파, 수입 물가 폭등 비상.',
+    '지하철 파업 오늘부터 시작, 실직자들 대거 유입으로 혼잡 극심.'
+  ],
+  '2000': [
+    '새천년 밀레니엄 버그(Y2K) 큰 혼란 없이 지나가... 안도의 한숨.',
+    '코스닥 지수 280선 돌파! 벤처 기업 투기 열풍 확산.',
+    '미국 닷컴 버블 붕괴 조짐? 나스닥 사상 최대 폭락.',
+    '국민 1,000만 명 초고속 인터넷 이용... "세상이 클릭으로 연결"',
+    '스타크래프트 대회 인기 폭발, 새로운 문화 코드로 정착.'
+  ],
+  '2010': [
+    '카카오톡 가입자 1,000만 돌파, 문자 전송 시장 지형도 바뀐다.',
+    '애플 아이폰 국내 출시 1년... 스마트폰 혁명 가속화.',
+    '취업 시장의 새로운 강자 "모바일 앱 개발자" 연봉 치솟아.',
+    '저성장 기조 고착화, 청년 실업률 역대 최고치 경신.',
+    'SNS를 통한 퇴근 후 업무 지시... "연결되지 않을 권리" 논란.'
+  ],
+  '2020': [
+    '전국 사회적 거리두기 4단계 전격 시행, 6시 이후 2인 금지.',
+    '백신 수급 불균형 속에 1차 접종 인원 4,000만 명 돌파.',
+    '재택근무 상시화 확산, 공유 오피스 시장 급격한 팽창.',
+    '배달 앱 라이더 수입 경쟁 치열... "연봉 1억 라이더 등장"',
+    '코인 투기 광풍... 2030 영끌 투자에 자산 격차 심화.'
+  ],
+  '2026': [
+    'ChatGPT 인공지능, 화이트칼라 업무 50% 대체... AI 실업 경보.',
+    '초거대 인공지능 제릴 "모든 직업의 보조자" 선언.',
+    '재택근무 폐지 기업 vs 유지 기업... 인재 확보 전쟁 벌어져.',
+    '배달비 5,000원 시대, 자영업자들 "배달 빼고 홀 장사만" 선언 잇달아.',
+    'AI 면접관의 거짓말 탐지 기능 탑재, 윤리적 가이드라인 시급.'
+  ]
+};

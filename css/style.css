@@ -680,6 +680,23 @@ body::after {
   border-radius: 2px;
   margin: 4px 0;
 }
+.log-line.news {
+  background: rgba(255, 50, 50, 0.1);
+  border-left: 4px solid #ff4444;
+  color: #ff9999;
+  padding: 8px 12px;
+  margin: 10px 0;
+  font-weight: 700;
+  animation: slideIn 0.4s ease-out;
+}
+.log-line.news::before {
+  content: ' [ 📻 BREAKING NEWS ] ';
+  display: block;
+  font-size: 10px;
+  margin-bottom: 4px;
+  opacity: 0.8;
+}
+@keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes fadeIn { from { opacity: 0; transform: translateX(-5px); } to { opacity: 1; transform: translateX(0); } }
 .log-line.ascii {
   white-space: pre;
@@ -729,9 +746,8 @@ body::after {
 #game-log {
   flex: 1;
   overflow-y: auto;
-  min-height: 0;
-  max-height: 75%;
-  padding-bottom: 20px;
+  min-height: 25%; /* 최소 25% 보장 */
+  padding-bottom: 60px; /* 선택지에 가려지지 않게 충분한 여백 제공 */
   scroll-behavior: smooth;
 }
 
@@ -739,8 +755,9 @@ body::after {
   flex-shrink: 0;
   border-top: 1px solid var(--border);
   padding-top: 8px;
-  max-height: 32vh;
+  max-height: 38vh; /* 선택지가 너무 많아도 38%까지만 차지하도록 */
   overflow-y: auto;
+  background: var(--bg); /* 배경색을 확실히 하여 겹칠 시 투명도 방지 */
 }
 
 .game-topbar {
