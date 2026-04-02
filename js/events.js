@@ -3,645 +3,436 @@
 // =============================================
 
 function buildDayEvents(profile, era) {
-  var p          = profile;
-  var e          = era;
-  var econ       = e.econ;
-  var commuteMin = p.home.commute;
-  var isRemote   = (p.home.type === 'home') || (p.company.id === 'home_2020') || (p.company.id === 'home_2010') || (p.company.id === 'home_2000');
-  var jobId      = p.job.id;
-  var eraId      = e.id;
+  var p = profile, e = era, weather = getWeather(), ev = [];
+  var core = getNarrativeCore(p, e);
+  var isRemote = (p.home.type === 'home') || (p.company.id === 'home_2020') || (p.company.id === 'home_2010') || (p.company.id === 'home_2000');
 
-  var ev = [];
-  var weather = getWeather();
-  var weatherIcon = ASCII[weather.id.toUpperCase()] || ASCII.SUNNY;
+  var blueprint = getDayBlueprint(p, e, isRemote);
 
-  // [New] Pick a Narrative Core for this playthrough
-  var core = getNarrativeCore(profile, era);
+  blueprint.forEach(function(slot) {
+    var eventObj = null;
+    if (slot.type === 'fixed') {
+      if (FIXED_EVENTS[slot.key]) eventObj = FIXED_EVENTS[slot.key](p, e, weather);
+    } else if (slot.type === 'random') {
+      eventObj = getRandomFromPool(slot.key, p, e);
+    } else if (slot.type === 'narrative') {
+      if (core && core.stages[slot.stage]) {
+        var s = core.stages[slot.stage];
+        eventObj = {
+          id: 'narrative_' + slot.stage, time: slot.time, loc: s.loc || '⚡ 이야기',
+          desc: [{ t:'time', m:'[ ' + slot.time + ' ] ' + s.title }].concat(s.descLines),
+          choices: s.choices, ascii: s.ascii
+        };
+      }
+    } else if (slot.type === 'phil') {
+      var phil = getPhilosophicalMoment(p, e, slot.key);
+      if (phil) {
+        eventObj = {
+          id: 'phil_' + slot.key, time: slot.time, loc: '💭 생각',
+          desc: [{ t:'time', m:'[ ' + slot.time + ' ] 잠시 생각이 든다.' }].concat(phil.descLines),
+          choices: phil.choices
+        };
+      }
+    }
 
-  // ── 01. 기상 ────────────────────────────────
-  var wakeDesc = [
-    { t:'time',  m:'[ 06:30 AM ] 알람이 울린다. (' + weather.label + ' 날씨)' },
-    { t:'story', m: e.name + '의 아침. 창밖은 ' + weather.label + ' 풍경이다.' },
-    { t:'system', m:'💭 ' + e.atmosphere[Math.floor(Math.random()*e.atmosphere.length)] },
+    if (eventObj) {
+      if (!eventObj.time) eventObj.time = slot.time;
+      ev.push(eventObj);
+    }
+  });
+  return ev;
+}
+
+function getDayBlueprint(p, e, isRemote) {
+  var bp = [
+    { time: '06:30', type: 'fixed', key: 'WAKE' },
+    { time: '07:00', type: 'fixed', key: 'MORNING_PREP' }
   ];
-  if (p.hasSpouse) wakeDesc.push({ t:'npc', m:'배우자: "일어나야지... 오늘도 힘내."' });
-  if (p.hasKid)    wakeDesc.push({ t:'npc', m:'아이: "아빠/엄마~ 학교 가기 싫어!"' });
-
-  var wakeChoices = [
-    { label:'▶ 바로 일어난다 (칼기상)', type:'normal',
-      effect: Object.assign({ stress:-3 }, weather.eff),
-      result:[{ t:'good', m:'의지력! 상쾌하게 하루 시작. (' + weather.label + ' 날씨의 영향)' }] },
-    { label:'▶ 10분만 더... (스누즈)', type:'normal',
-      effect: Object.assign({ stamina:5, time:10 }, weather.eff),
-      result:[{ t:'story', m:'10분이 지나 겨우 일어났다.' }] },
-    { label:'▶ 30분 더 잔다 (택시비 각오)', type:'bad',
-      effect: Object.assign({ stamina:10, stress:8, time:30, money:-(econ.bus*10) }, weather.eff),
-      result:[{ t:'bad', m:'지각할 것 같다. 택시를 잡았다. (-' + (econ.bus*10).toLocaleString() + '원)' }] },
-  ];
-
-  ev.push({ id:'wake', time:'06:30', loc:'🏠 집 — 침실', ascii: weatherIcon, desc:wakeDesc, choices:wakeChoices });
-
-  // ── 02. 아침 준비 ────────────────────────────
-  var morningDesc = [
-    { t:'time',  m:'[ 07:00 AM ] 아침 준비 시간.' },
-  ];
-  if (p.hasSpouse) morningDesc.push({ t:'npc', m:'배우자: "밥 차려줄게, 먹고 가!"' });
-  if (p.hasKid)    morningDesc.push({ t:'npc', m:'아이: "아침밥은요?"' });
-
-  var morningChoices = [
-    { label:'▶ 집밥 든든하게 먹는다', type:'normal',
-      effect:{ stamina:20, time:25 },
-      result:[{ t:'good', m:'든든한 아침. 점심까지 버틸 수 있다.' }] },
-    { label:'▶ 편의점 삼각김밥 (-' + Math.round(econ.jajangmyeon*0.3).toLocaleString() + '원)', type:'normal',
-      effect:{ stamina:7, money:-Math.round(econ.jajangmyeon*0.3), time:5 },
-      result:[{ t:'story', m:'편의점 삼각김밥 2개.' }] },
-    { label:'▶ 굶고 나간다 (시간 없음)', type:'bad',
-      effect:{ stamina:-10, stress:5 },
-      result:[{ t:'bad', m:'공복 출근. 점심까지 버텨야 한다.' }] },
-  ];
-  if (p.hasKid) {
-    morningChoices.push({ label:'▶ 아이 등교 챙겨주고 나간다', type:'family',
-      effect:{ stamina:-3, time:20, rel_kid:8, flag:'goodParent' },
-      result:[
-        { t:'relation', m:'아이: "아빠/엄마 사랑해!"' },
-        { t:'good', m:'좋은 부모 포인트 획득!' }
-      ] });
-  }
-  if (eraId === '1980') {
-    morningChoices.push({ label:'▶ 새마을 라디오 체조한다', type:'normal',
-      effect:{ stamina:10, stress:-5, time:10 },
-      result:[{ t:'good', m:'건강한 아침 체조. 몸이 개운하다.' }] });
-  }
-  if (eraId === '2026') {
-    morningChoices.push({ label:'▶ ChatGPT로 오늘 일정 요약받는다', type:'normal',
-      effect:{ stress:-3, time:5, flag:'ai_user' },
-      result:[{ t:'good', m:'AI가 오늘 할 일을 정리해줬다.' }] });
-  }
-  if (eraId === '2020') {
-    morningChoices.push({ label:'▶ 마스크 착용 확인 후 출발', type:'normal',
-      effect:{ stress:2 },
-      result:[{ t:'story', m:'마스크 없이는 건물에 못 들어간다.' }] });
-  }
-
-  // 날씨와 상태에 따른 아침 추가 활동 무작위 생성
-  if (Math.random() > 0.5) {
-    var act = getMorningActivity(weather);
-    morningChoices.push(act.choice);
-  }
-
-  ev.push({ id:'morning', time:'07:00', loc:'🏠 집 — 주방', desc:morningDesc, choices:morningChoices });
-
-  // ── 03. 출근 ────────────────────────────────
   if (!isRemote) {
-    var commuteStress   = Math.floor(commuteMin / 15);
-    var commuteStamina  = -Math.floor(commuteMin / 12);
-    var transitCost     = commuteMin > 5 ? econ.bus : 0;
-
-    var commuteDesc = [
-      { t:'time',  m:'[ 07:40 AM ] 출근길. 목적지: ' + p.company.label },
-      { t:'story', m:'통근 거리 ' + commuteMin + '분. ' + (commuteMin>=80 ? '장거리 출근의 피로감이 이미 느껴진다.' : commuteMin<=10 ? '직주근접의 여유!' : '오늘도 빠르게 이동한다.') },
-    ];
-    if (eraId==='1980') commuteDesc.push({ t:'system', m:'버스비 ' + econ.bus + '원. 지하철은 아직 일부 구간만.' });
-    if (eraId==='2020') commuteDesc.push({ t:'bad', m:'마스크를 끼고 지하철을 탄다.' });
-
-    var commuteChoices = [
-      { label:'▶ 대중교통 탑승 (-' + transitCost.toLocaleString() + '원)', type:'normal',
-        effect:{ stress:commuteStress, stamina:commuteStamina, money:-transitCost, time:commuteMin },
-        result:[{ t:'story', m:commuteMin + '분 후 도착.' }] },
-      { label:'▶ 택시 탑승 (-' + Math.round(commuteMin*econ.bus*0.5).toLocaleString() + '원, 빠름)', type:'money',
-        effect:{ stress:Math.max(0,commuteStress-3), money:-Math.round(commuteMin*econ.bus*0.5), time:Math.floor(commuteMin*0.6) },
-        result:[{ t:'money', m:'택시비 -' + Math.round(commuteMin*econ.bus*0.5).toLocaleString() + '원. 편하게 도착.' }] },
-    ];
-    if (commuteMin >= 30) {
-      commuteChoices.push({ label:
-        eraId==='1980' || eraId==='1997' ? '▶ 이동 중 존다' :
-        '▶ 이동 중 업무 처리 (이메일/문서)',
-        type:'normal',
-        effect:{ stress:commuteStress+3, stamina:commuteStamina, money:-transitCost, time:commuteMin, flag:'diligent' },
-        result:[{ t:'good', m:
-          eraId==='1980' || eraId==='1997' ? '이동 중 단암. 컴퓨터도 폰도 없는 시대다.' :
-          '이동 중에도 일을 했다. 효율적이다.' }] });
-      commuteChoices.push({ label:'▶ 이어폰 끼고 팟캐스트/음악 듣는다', type:'normal',
-        effect:{ stress:commuteStress-4, stamina:commuteStamina, money:-transitCost, time:commuteMin },
-        result:[{ t:'good', m:'정신적 여유를 챙겼다.' }] });
-    }
-
-    var news = getNews(eraId);
-    if (news) {
-      ev.push({ id:'morning_news', time:'07:40', loc:'📻 뉴스 속보', desc:[{ t:'news', m: news }] });
-    }
-
-    var commuteAscii = (eraId === '1980') ? ASCII.BUS : ASCII.COMMUTE;
-    ev.push({ id:'commute', time:'07:40', loc:(eraId==='1980' ? '🚌' : '🚇') + ' 출근길 (' + commuteMin + '분)', ascii: commuteAscii, desc:commuteDesc, choices:commuteChoices });
+    bp.push({ time: '07:40', type: 'fixed', key: 'COMMUTE' });
+    bp.push({ time: '08:10', type: 'random', key: 'COMMUTE_RANDOM' });
+    bp.push({ time: '08:30', type: 'phil',   key: 'morning' });
   } else {
-    var remoteDesc = [
-      { t:'time',  m:'[ 09:00 AM ] 재택근무 시작.' },
-      { t:'good',  m:'출퇴근 없음. 하지만 집이 사무실이 됐다.' },
-    ];
-    if (eraId==='2020') remoteDesc.push({ t:'story', m:'코로나로 인한 강제 재택. 익숙해지는 중.' });
+    bp.push({ time: '09:00', type: 'fixed', key: 'REMOTE_START' });
+  }
+  bp.push({ time: '09:00', type: 'fixed', key: 'WORK_AM' });
+  bp.push({ time: '10:30', type: 'random', key: 'MORNING_RANDOM' });
+  bp.push({ time: '12:00', type: 'fixed', key: 'LUNCH' });
+  bp.push({ time: '13:00', type: 'phil', key: 'lunch' });
+  bp.push({ time: '14:00', type: 'fixed', key: 'WORK_PM' });
+  bp.push({ time: '14:30', type: 'narrative', stage: 0 });
+  bp.push({ time: '16:00', type: 'random', key: 'AFTERNOON_RANDOM' });
+  bp.push({ time: '16:30', type: 'narrative', stage: 1 });
+  if (Math.random() < 0.2) bp.push({ time: '16:45', type: 'random', key: 'WILDCARD' });
+  bp.push({ time: '18:00', type: 'fixed', key: 'LEAVE' });
+  if (!isRemote) bp.push({ time: '18:30', type: 'fixed', key: 'GO_HOME' });
+  bp.push({ time: '19:30', type: 'fixed', key: 'CHORES' });
+  bp.push({ time: '20:00', type: 'random', key: 'FAMILY_RANDOM' });
+  bp.push({ time: '21:00', type: 'random', key: 'INCOME_RANDOM' });
+  bp.push({ time: '21:30', type: 'phil', key: 'evening' });
+  bp.push({ time: '22:00', type: 'fixed', key: 'NIGHT' });
+  return bp;
+}
 
-    ev.push({ id:'remote_start', time:'09:00', loc:'🏠 재택근무 시작', desc:remoteDesc,
+var FIXED_EVENTS = {
+  WAKE: function(p, e, weather) {
+    var desc = [
+      { t:'time',  m:'[ 06:30 AM ] 알람이 울린다. (' + weather.label + ' 날씨)' },
+      { t:'story', m: e.name + '의 아침. 창밖은 ' + weather.label + ' 풍경이다.' },
+      { t:'system', m:'💭 ' + e.atmosphere[Math.floor(Math.random()*e.atmosphere.length)] },
+    ];
+    if (p.hasSpouse) desc.push({ t:'npc', m:'배우자: "일어나야지... 오늘도 힘내."' });
+    if (p.hasKid)    desc.push({ t:'npc', m:'아이: "아빠/엄마~ 학교 가기 싫어!"' });
+
+    var choices = [
+      { label:'▶ 바로 일어난다 (칼기상)', type:'normal',
+        effect: Object.assign({ stress:-3 }, weather.eff),
+        result:[{ t:'good', m:'의지력! 상쾌하게 하루 시작. (' + weather.label + ' 날씨의 영향)' }] },
+      { label:'▶ 10분만 더... (스누즈)', type:'normal',
+        effect: Object.assign({ stamina:5, time:10 }, weather.eff),
+        result:[{ t:'story', m:'10분이 지나 겨우 일어났다.' }] },
+      { label:'▶ 30분 더 잔다 (택시비 각오)', type:'bad',
+        effect: Object.assign({ stamina:10, stress:8, time:30, money:-(e.econ.bus*10) }, weather.eff),
+        result:[{ t:'bad', m:'지각할 것 같다. 택시를 잡았다. (-' + (e.econ.bus*10).toLocaleString() + '원)' }] },
+    ];
+    return { id:'wake', loc:'🏠 집 — 침실', ascii: ASCII[weather.id.toUpperCase()] || ASCII.SUNNY, desc: desc, choices: choices };
+  },
+
+  MORNING_PREP: function(p, e, weather) {
+    var econ = e.econ;
+    var desc = [{ t:'time',  m:'[ 07:00 AM ] 아침 준비 시간.' }];
+    if (p.hasSpouse) desc.push({ t:'npc', m:'배우자: "밥 차려줄게, 먹고 가!"' });
+    if (p.hasKid)    desc.push({ t:'npc', m:'아이: "아침밥은요?"' });
+
+    var choices = [
+      { label:'▶ 집밥 든든하게 먹는다', type:'normal', effect:{ stamina:20, time:25 }, result:[{ t:'good', m:'든든한 아침. 점심까지 버틸 수 있다.' }] },
+      { label:'▶ 편의점 삼각김밥 (-' + Math.round(econ.jajangmyeon*0.3).toLocaleString() + '원)', type:'normal',
+        effect:{ stamina:7, money:-Math.round(econ.jajangmyeon*0.3), time:5 },
+        result:[{ t:'story', m:'편의점 삼각김밥 2개.' }] },
+      { label:'▶ 굶고 나간다 (시간 없음)', type:'bad', effect:{ stamina:-10, stress:5 }, result:[{ t:'bad', m:'공복 출근. 점심까지 버텨야 한다.' }] },
+    ];
+    if (p.hasKid) {
+      choices.push({ label:'▶ 아이 등교 챙겨주고 나간다', type:'family', effect:{ stamina:-3, time:20, rel_kid:8, flag:'goodParent' },
+        result:[{ t:'relation', m:'아이: "아빠/엄마 사랑해!"' }, { t:'good', m:'좋은 부모 포인트 획득!' }] });
+    }
+    if (e.id === '1980') choices.push({ label:'▶ 새마을 라디오 체조한다', type:'normal', effect:{ stamina:10, stress:-5, time:10 }, result:[{ t:'good', m:'건강한 아침 체조.' }] });
+    if (e.id === '2026') choices.push({ label:'▶ ChatGPT로 오늘 일정 요약받는다', type:'normal', effect:{ stress:-3, time:5, flag:'ai_user' }, result:[{ t:'good', m:'AI가 오늘 할 일을 정리해줬다.' }] });
+    if (e.id === '2020') choices.push({ label:'▶ 마스크 착용 확인 후 출발', type:'normal', effect:{ stress:2 }, result:[{ t:'story', m:'마스크 없이는 건물에 못 들어간다.' }] });
+
+    if (Math.random() > 0.5) {
+      var act = getMorningActivity(weather);
+      choices.push(act.choice);
+    }
+    return { id:'morning', loc:'🏠 집 — 주방', desc: desc, choices: choices };
+  },
+
+  REMOTE_START: function(p, e) {
+    var econ = e.econ;
+    var desc = [{ t:'time',  m:'[ 09:00 AM ] 재택근무 시작.' }, { t:'good',  m:'출퇴근 없음. 하지만 집이 사무실이 됐다.' }];
+    if (e.id === '2020') desc.push({ t:'story', m:'코로나로 인한 강제 재택. 익숙해지는 중.' });
+    return {
+      id:'remote_start', loc:'🏠 재택근무 시작', desc: desc,
       choices:[
-        { label:'▶ 업무 환경 세팅 후 시작', type:'normal',
-          effect:{ stress:-3, stamina:3 },
-          result:[{ t:'good', m:'집에서 일하는 쾌적함. 오늘도 화이팅.' }] },
-        { label:'▶ 잠옷 차림으로 노트북만 켠다', type:'normal',
-          effect:{ stress:-5, stamina:5 },
-          result:[{ t:'story', m:'자유로운 재택. 집중력 유지가 관건이다.' }] },
+        { label:'▶ 업무 환경 세팅 후 시작', type:'normal', effect:{ stress:-3, stamina:3 }, result:[{ t:'good', m:'집에서 일하는 쾌적함. 오늘도 화이팅.' }] },
+        { label:'▶ 잠옷 차림으로 노트북만 켠다', type:'normal', effect:{ stress:-5, stamina:5 }, result:[{ t:'story', m:'자유로운 재택. 집중력 유지가 관건이다.' }] },
         { label:'▶ 커피 한 잔 내리고 느긋하게 시작 (-' + econ.coffee.toLocaleString() + '원)', type:'normal',
           effect:{ stress:-4, stamina:4, money:-econ.coffee },
           result:[{ t:'story', m:'집에서 내린 커피. 여유로운 재택의 낭만.' }] },
       ]
-    });
-  }
+    };
+  },
 
-  // ── 04. 출근길 랜덤 이벤트 ──────────────────────
-  if (!isRemote && commuteMin > 15) {
-    var commuteEvents = [
-      {
-        title: '⚡ 지하철 연착',
-        desc: [{ t:'bad', m:'지하철이 연착됐다! 신호 장애.' }],
-        choices: [
-          { label:'▶ 기다린다', type:'bad', effect:{ stress:8, time:12 }, result:[{ t:'bad', m:'12분 지연.' }] },
-          { label:'▶ 버스로 우회', type:'normal', effect:{ stress:5, money:-econ.bus, time:8 }, result:[{ t:'story', m:'버스로 갔다.' }] },
-        ]
-      },
-      {
-        title: '☕ 커피 1+1 행사!',
-        desc: [{ t:'event', m:'편의점에서 커피 1+1 행사 중! 아메리카노 ' + econ.coffee.toLocaleString() + '원.' }],
-        choices: [
-          { label:'▶ 2잔 산다 (1잔은 동료 선물)', type:'money', effect:{ stress:-5, stamina:8, money:-econ.coffee, time:5, flag:'kind' }, result:[{ t:'good', m:'동료 커피까지 챙겼다. 인심 포인트!' }] },
-          { label:'▶ 내 것만 1잔', type:'normal', effect:{ stress:-3, stamina:6, money:-econ.coffee, time:5 }, result:[{ t:'story', m:'커피 한 잔. 오늘도 버틸 수 있다.' }] },
-          { label:'▶ 지나친다 (절약)', type:'normal', effect:{ stress:2 }, result:[{ t:'inner', m:'\'참아야 해...\'' }] },
-        ]
-      },
-      {
-        title: '👜 길에서 지갑 발견',
-        desc: [{ t:'event', m:'지갑이 떨어져 있다. 안에 돈이 있는 것 같다.' }],
-        choices: [
-          { label:'▶ 경찰서 신고', type:'normal', effect:{ stress:3, time:15, flag:'honest' }, result:[{ t:'good', m:'양심적인 행동. 마음이 편하다.' }] },
-          { label:'▶ 모른 척 지나간다', type:'bad', effect:{ stress:5 }, result:[{ t:'inner', m:'찜찜한 하루 시작.' }] },
-        ]
-      },
-      {
-        title: '🌧️ 갑자기 비가 온다',
-        desc: [{ t:'bad', m:'예보 없이 비가 쏟아진다! 우산이 없다.' }],
-        choices: [
-          { label:'▶ 편의점 우산 산다 (-' + Math.round(econ.coffee*0.8).toLocaleString() + '원)', type:'money', effect:{ money:-Math.round(econ.coffee*0.8), stress:3 }, result:[{ t:'story', m:'우산 구입 완료. 일회용이라 좀 불안하다.' }] },
-          { label:'▶ 그냥 뛰어간다', type:'bad', effect:{ stress:10, stamina:-8 }, result:[{ t:'bad', m:'흠뻑 젖었다. 온몸이 불쾌하다.' }] },
-          { label:'▶ 비 그치길 기다린다 (+10분)', type:'normal', effect:{ stress:5, time:10 }, result:[{ t:'story', m:'잠깐 처마 밑에서 기다렸다.' }] },
-        ]
-      },
+  COMMUTE: function(p, e) {
+    var min = p.home.commute;
+    var econ = e.econ;
+    var transitCost = min > 5 ? econ.bus : 0;
+    var commuteStress = Math.floor(min / 15);
+    var commuteStamina = -Math.floor(min / 12);
+
+    var desc = [
+      { t:'time',  m:'[ 07:40 AM ] 출근길. 목적지: ' + p.company.label },
+      { t:'story', m:'통근 거리 ' + min + '분. ' + (min>=80 ? '장거리 출근의 피로감이 이미 느껴진다.' : min<=10 ? '직주근접의 여유!' : '오늘도 빠르게 이동한다.') },
     ];
+    if (e.id === '1980') desc.push({ t:'system', m:'버스비 ' + econ.bus + '원. 지하철은 아직 일부 구간만.' });
+    if (e.id === '2020') desc.push({ t:'bad', m:'마스크를 끼고 지하철을 탄다.' });
 
-    if (eraId === '1980') {
-      commuteEvents.push({
-        title: '🚌 버스가 초만원',
-        desc: [{ t:'bad', m:'아침 버스가 사람으로 꽉 찼다. 몸이 눌린다.' }],
-        choices: [
-          { label:'▶ 억지로 탄다', type:'bad', effect:{ stress:10, stamina:-5, money:-econ.bus, time:commuteMin }, result:[{ t:'bad', m:'꼼짝 못 하고 도착했다.' }] },
-          { label:'▶ 다음 버스 기다린다 (+15분)', type:'normal', effect:{ stress:5, money:-econ.bus, time:commuteMin+15 }, result:[{ t:'story', m:'여유롭게 다음 버스에 탔다.' }] },
-        ]
-      });
-    }
-
-    if (eraId === '2026') {
-      commuteEvents.push({
-        title: '🚇 GTX 앱 오류',
-        desc: [{ t:'bad', m:'앱에서 GTX 예약 오류가 났다. 결제는 됐는데...' }],
-        choices: [
-          { label:'▶ 고객센터에 전화한다 (+20분)', type:'bad', effect:{ stress:15, time:20 }, result:[{ t:'bad', m:'연결까지 20분. 그동안 지각 확정.' }] },
-          { label:'▶ 일반 전철로 우회한다', type:'normal', effect:{ stress:8, money:-econ.bus, time:30 }, result:[{ t:'story', m:'돌아가는 길. 이것도 나쁘지 않다.' }] },
-        ]
-      });
-    }
-
-    var picked = commuteEvents[Math.floor(Math.random()*commuteEvents.length)];
-    ev.push({
-      id:'commute_event', time:'08:10', loc:'🚇 출근길 — 돌발',
-      desc:[ { t:'time', m:'[ 08:10 AM ] 출근길 돌발 상황!' } ].concat(picked.desc),
-      choices: picked.choices
-    });
-
-    // [New] Philosophical Moment - Morning Commute
-    var philMorning = getPhilosophicalMoment(p, e, 'morning');
-    if (philMorning) {
-      ev.push({
-        id:'phil_morning', time:'08:30', loc:'💭 이동 중 — 생각',
-        desc:[ { t:'time', m:'[ 08:30 AM ] 잠시 생각이 든다.' } ].concat(philMorning.descLines),
-        choices: philMorning.choices
-      });
-    }
-  }
-
-  // ── 05. 오전 업무 ────────────────────────────
-  var workDesc = [
-    { t:'time',  m:'[ 09:00 AM ] 업무 시작. (' + e.name + ')' },
-    { t:'story', m:'오늘 하루 업무를 시작한다.' },
-  ];
-  if (eraId==='1980') workDesc.push({ t:'system', m:'부장님: "정신 차리고 빠릿빠릿 하게 움직여!"' });
-  if (eraId==='1997') workDesc.push({ t:'bad', m:'구조조정 소문이 오늘도 돌고 있다...' });
-  if (eraId==='2026') workDesc.push({ t:'story', m:'ChatGPT로 초안 작업... AI 덕분에 빠르다.' });
-  if (jobId==='dismissed') workDesc.push({ t:'bad', m:'오늘도 구직 사이트를 열었다. 연락이 없다.' });
-
-  var workChoices = [
-    { label:'▶ 집중 모드 (2시간 몰입)', type:'normal',
-      effect:{ stress:8, stamina:-12, time:120, flag:'diligent',
-        money: p.employType.id==='parttime' ? p.job.dailyPay*2 : 0 },
-      result:[{ t:'good', m:'오전 업무 처리 완료. 효율적이었다.' }] },
-    { label:'▶ 커피 먹고 천천히 시작 (-' + econ.coffee.toLocaleString() + '원)', type:'normal',
-      effect:{ stress:3, stamina:5, money:-econ.coffee, time:130 },
-      result:[{ t:'story', m:'커피로 정신을 차리고 시작했다.' }] },
-    { label: eraId==='1980' ? '▶ 동료랑 잡담하다 오전이 감' :
-             eraId==='1997' ? '▶ 삐삐 확인하고 공중전화 다니다가 감' :
-             eraId==='2000' ? '▶ 버디버디/싸이월드 하다가 점심 됨' :
-             eraId==='2010' ? '▶ 카카오톡/트위터 보다 오전이 증발' :
-             '▶ 인스타/유튜브 쇼츠 보다 오전이 증발', type:'bad',
-      effect:{ stress:-5, time:120 },
-      result:[{ t:'bad', m: eraId==='1980' ? '잡담으로 오전이 날아갔다.' :
-                             eraId==='1997' ? '삐삐 뚜뚜뚜... 공중전화 다니느라 오전이 갔다.' :
-                             eraId==='2000' ? '싸이월드 방명록 달고 버디버디 채팅하다 시간이 갔다.' :
-                             eraId==='2010' ? '카톡 단톡방이 울렸다. 답장하다 오전이 증발했다.' :
-                             '알고리즘에 빠졌다. 쇼츠 10분이 1시간이 됐다.' }] },
-    { label:'▶ 동료와 잡담하며 시간 보냄', type:'normal',
-      effect:{ stress:-8, stamina:-3, time:120, flag:'socialLunch' },
-      result:[{ t:'story', m:'수다로 시간이 날아갔다. 그래도 스트레스는 풀렸다.' }] },
-  ];
-  if (jobId==='selfemploy' || jobId==='restaurant') {
-    workChoices.push({ label:'▶ 가게 마케팅/홍보에 집중', type:'money',
-      effect:{ stress:10, stamina:-8, money:Math.floor(econ.wage*0.03), time:120 },
-      result:[{ t:'money', m:'마케팅 효과! 추가 매출 +' + Math.floor(econ.wage*0.03).toLocaleString() + '원' }] });
-  }
-  if (eraId==='1997' && jobId==='dismissed') {
-    workChoices.push({ label:'▶ 오전 내내 취업 면접을 본다', type:'history',
-      effect:{ stress:15, stamina:-10, time:180, flag:'job_hunt' },
-      result:[{ t:'story', m:'면접을 3개나 봤다. 지쳐도 계속해야 한다.' }] });
-  }
-  if (eraId==='2026') {
-    workChoices.push({ label:'▶ AI 도구로 업무 자동화 세팅한다', type:'normal',
-      effect:{ stress:-2, time:150, flag:'ai_user', money:20000 },
-      result:[{ t:'good', m:'AI 자동화 세팅 완료. 다음 주 업무가 줄어들 것이다.' }] });
-  }
-
-  var officeAscii = (eraId === '1980') ? ASCII.FACTORY : ASCII.WORKING;
-  ev.push({ id:'morning_work', time:'09:00', loc:'💼 ' + p.company.label, ascii: officeAscii, desc:workDesc, choices:workChoices });
-
-  // ── 06. 오전 랜덤 이벤트 (시대별) ────────────────
-  var morningPool = getMorningPool(p, e);
-  if (morningPool.length > 0) {
-    var me = morningPool[Math.floor(Math.random()*morningPool.length)];
-    ev.push({
-      id:'morning_event', time:'10:30', loc:'📱 오전 알림',
-      desc:[ { t:'time', m:'[ 10:30 AM ] 알림이 왔다.' }, { t:'event', m:'⚡ ' + me.title } ].concat(me.descLines),
-      choices: me.choices
-    });
-  }
-
-  // ── 07. 점심 ────────────────────────────────
-  var lunchDesc = [
-    { t:'time',  m:'[ 12:00 PM ] 점심 시간!' },
-  ];
-  if (eraId==='1980') lunchDesc.push({ t:'system', m:'구내식당 밥값: ' + econ.jajangmyeon + '원' });
-  if (eraId==='1997') lunchDesc.push({ t:'bad', m:'요즘 직장인들이 편의점 도시락으로 끼니를 해결한다.' });
-
-  var lunchChoices = [
-    { label:'▶ 동료들과 외식 (-' + econ.jajangmyeon.toLocaleString() + '원)', type:'normal',
-      effect:{ stress:-10, stamina:15, money:-econ.jajangmyeon, time:60, flag:'socialLunch' },
-      result:[
-        { t:'good', m:'맛있는 점심 + 수다로 오후 활력 충전!' },
-        { t:'npc', m:'동료: "요즘 팀장님 많이 예민하시지 않아요?" (뒷담화 시작)' }
-      ] },
-    { label:'▶ 혼밥 (-' + Math.round(econ.jajangmyeon*0.6).toLocaleString() + '원)', type:'normal',
-      effect:{ stress:2, stamina:10, money:-Math.round(econ.jajangmyeon*0.6), time:30 },
-      result:[{ t:'story', m:'조용한 혼밥. 30분이 남는다.' }] },
-    { label:'▶ 도시락 (절약!)', type:'money',
-      effect:{ stress:-2, stamina:12 },
-      result:[{ t:'good', m:'준비해온 도시락. 건강하고 경제적!' }] },
-    { label:'▶ 점심 건너뜀 (절약 + 다이어트)', type:'bad',
-      effect:{ stress:5, stamina:-15 },
-      result:[{ t:'bad', m:'배가 고프다... 오후에 집중이 안 될 것 같다.' }] },
-  ];
-  // 배달 옵션: 시대별 분기
-  if (eraId === '2020' || eraId === '2026') {
-    lunchChoices.push({ label:'▶ 배달앱으로 시켜먹기 (-' + Math.round(econ.jajangmyeon*1.4).toLocaleString() + '원)', type:'normal',
-      effect:{ stress:-3, stamina:12, money:-Math.round(econ.jajangmyeon*1.4), time:40 },
-      result:[{ t:'story', m:'배달앱 클릭 한 번에 배달. -' + Math.round(econ.jajangmyeon*1.4).toLocaleString() + '원' }] });
-  } else if (eraId === '2010') {
-    lunchChoices.push({ label:'▶ 전화로 배달 시켜먹기 (-' + Math.round(econ.jajangmyeon*1.3).toLocaleString() + '원)', type:'normal',
-      effect:{ stress:-2, stamina:11, money:-Math.round(econ.jajangmyeon*1.3), time:40 },
-      result:[{ t:'story', m:'전화 배달. 배달앱은 아직 생소하다.' }] });
-  } else if (eraId === '1997' || eraId === '2000') {
-    lunchChoices.push({ label:'▶ 전화로 짜장면 배달 (-' + Math.round(econ.jajangmyeon*1.2).toLocaleString() + '원)', type:'normal',
-      effect:{ stress:-2, stamina:11, money:-Math.round(econ.jajangmyeon*1.2), time:40 },
-      result:[{ t:'story', m:'전화로 야... (5분 뒤) 배달직 아저씨가 온다!' }] });
-  }
-  if (eraId==='1980') {
-    lunchChoices.push({ label:'▶ 구내식당 정식 먹는다', type:'normal',
-      effect:{ stamina:18, money:-econ.jajangmyeon, stress:-5, time:30 },
-      result:[{ t:'good', m:'구내식당 따끈한 정식. 옛날 직장인의 낭만.' }] });
-  }
-  if (eraId==='2020') {
-    lunchChoices.push({ label:'▶ [코로나] 칸막이 혼밥 식당', type:'normal',
-      effect:{ stamina:10, money:-econ.jajangmyeon, stress:5, time:30 },
-      result:[{ t:'story', m:'칸막이 설치된 식당. 낯선 풍경이 이제 익숙해졌다.' }] });
-  }
-
-  ev.push({ id:'lunch', time:'12:00', loc:'🍱 점심 시간', ascii: ASCII.LUNCH, desc:lunchDesc, choices:lunchChoices });
-
-  // [New] Philosophical Moment - Lunchtime
-  var philLunch = getPhilosophicalMoment(p, e, 'lunch');
-  if (philLunch) {
-    var philAscii = (eraId === '2026') ? ASCII.MACHINE : (Math.random() > 0.5 ? ASCII.COFFEE : ASCII.SODA);
-    ev.push({
-      id:'phil_lunch', time:'13:00', loc:'💭 식후 — 고찰', ascii: philAscii,
-      desc:[ { t:'time', m:'[ 01:00 PM ] 식사를 마치고 짧은 생각.' } ].concat(philLunch.descLines),
-      choices: philLunch.choices
-    });
-  }
-
-  // ── 08. 오후 업무 ────────────────────────────
-  var pmDesc = [
-    { t:'time',  m:'[ 02:00 PM ] 점심 식곤증과 싸우는 오후.' },
-  ];
-  if (eraId==='1997') pmDesc.push({ t:'bad', m:'오늘 구조조정 명단이 또 나왔다는 소문이 돈다.' });
-  if (eraId==='2026') pmDesc.push({ t:'story', m:'AI 리포트 초안이 나왔다. 내가 할 일이 줄고 있다...' });
-  if (eraId==='2020') pmDesc.push({ t:'story', m:'오후 화상회의 3개. 실제 회의보다 피곤하다.' });
-
-  var pmChoices = [
-    { label:'▶ 집중 업무 처리', type:'normal',
-      effect:{ stress:8, stamina:-12, time:90, flag:'diligent',
-        money: p.employType.id==='parttime' ? Math.floor(p.job.dailyPay*1.5) : 0 },
-      result:[{ t:'good', m:'오후 업무 완수. 퇴근이 가까워진다.' }] },
-    { label:'▶ 졸음과 싸우며 겨우 버틴다', type:'bad',
-      effect:{ stress:5, stamina:-8, time:90 },
-      result:[{ t:'bad', m:'극도의 졸음. 어떻게든 버텼다.' }] },
-    { label:'▶ 화장실 10분 쉬는 타임', type:'normal',
-      effect:{ stress:-5, stamina:5, time:100 },
-      result:[{ t:'inner', m:'\'화장실이 유일한 안식처...\'' }] },
-    { label:'▶ 아메리카노로 버팀 (-' + econ.coffee.toLocaleString() + '원)', type:'normal',
-      effect:{ stress:-3, stamina:8, money:-econ.coffee, time:95 },
-      result:[{ t:'story', m:'카페인으로 졸음을 이겼다.' }] },
-    { label:'▶ 팀장한테 잘 보이려고 적극적으로 일한다', type:'normal',
-      effect:{ stress:12, stamina:-15, time:90, flag:'diligent', money:30000 },
-      result:[
-        { t:'good', m:'팀장의 눈에 띄었다. "수고해요" 한 마디가 힘이 된다.' },
-      ] },
-  ];
-
-  ev.push({ id:'afternoon_work', time:'14:00', loc:'💼 오후 업무', desc:pmDesc, choices:pmChoices });
-
-  // [Narrative Core Stage 1] — 14:30
-  if (core && core.stages[0]) {
-    var s1 = core.stages[0];
-    ev.push({
-      id:'narrative_1', time:'14:30', loc: s1.loc || '⚡ 오늘 하루의 균열',
-      desc:[ { t:'time', m:'[ 02:30 PM ] ' + s1.title } ].concat(s1.descLines),
-      choices: s1.choices,
-      ascii: s1.ascii
-    });
-  }
-
-  // ── 09. 랜덤 돌발 이벤트 (Wildcard) ────────────────
-  if (Math.random() < 0.2) { // 20% 확률로 돌발 상황
-    var wildEv = WILDCARD_POOL[Math.floor(Math.random() * WILDCARD_POOL.length)];
-    ev.push(Object.assign({}, wildEv, { time:'16:30' }));
-  }
-
-  // ── 10. 오후 랜덤 이벤트 ──────────────────────
-  var afternoonPool = getAfternoonPool(p, e);
-  if (afternoonPool.length > 0) {
-    var ae = afternoonPool[Math.floor(Math.random()*afternoonPool.length)];
-    ev.push({
-      id:'afternoon_event', time:'16:00', loc:'⚡ 오후 돌발 이벤트',
-      desc:[ { t:'time', m:'[ 04:00 PM ] 갑자기 일이 터졌다!' }, { t:'event', m:'⚡ ' + ae.title } ].concat(ae.descLines),
-      choices: ae.choices
-    });
-  }
-
-  // [Narrative Core Stage 2] — 16:30
-  if (core && core.stages[1]) {
-    var s2 = core.stages[1];
-    ev.push({
-      id:'narrative_2', time:'16:30', loc: s2.loc || '⚡ 깊어가는 이야기',
-      desc:[ { t:'time', m:'[ 04:30 PM ] ' + s2.title } ].concat(s2.descLines),
-      choices: s2.choices,
-      ascii: s2.ascii
-    });
-  }
-
-  // ── 10. 퇴근 ────────────────────────────────
-  var leaveDesc = [
-    { t:'time',  m:'[ 06:00 PM ] 퇴근 시간이다!' },
-  ];
-  if (eraId==='1980') leaveDesc.push({ t:'system', m:'부장님이 아직 자리에 있다...' });
-  if (eraId==='1997') leaveDesc.push({ t:'bad', m:'오늘도 살아남았다. 내일은 어떨지 모른다.' });
-  if (eraId==='2010') leaveDesc.push({ t:'bad', m:'카카오톡에 메시지가 왔다. 퇴근 전 업무 요청인가...' });
-
-  var leaveChoices = [
-    { label:'▶ 칼퇴근 (6시 정각)', type:'normal',
-      effect:{ stress:-5,
-        money: p.employType.id==='parttime' ? Math.floor(p.job.dailyPay*2) : 0 },
-      result:[{ t:'good', m:'칼퇴! 자유다!!!' }] },
-    { label:'▶ 30분 눈치 보다 퇴근', type:'bad',
-      effect:{ stress:8, stamina:-5, time:30 },
-      result:[{ t:'story', m:'30분 눈치 추가. 피곤하다.' }] },
-    { label:'▶ 야근 2시간 (+' + Math.round(p.job.dailyPay*0.5).toLocaleString() + '원)', type:'money',
-      effect:{ stress:18, stamina:-15, time:120, flag:'overtime',
-        money: Math.round(p.job.dailyPay*0.5) },
-      result:[
-        { t:'bad', m:'야근 시작...' },
-        { t:'money', m:'야근수당 +' + Math.round(p.job.dailyPay*0.5).toLocaleString() + '원' }
-      ] },
-    { label:'▶ 퇴근 전 동료와 커피 (-' + econ.coffee.toLocaleString() + '원)', type:'normal',
-      effect:{ stress:-8, money:-econ.coffee, time:20 },
-      result:[{ t:'good', m:'퇴근 전 커피 타임. 소소한 행복.' }] },
-    { label:'▶ 내일 일거리를 미리 정리하고 퇴근', type:'normal',
-      effect:{ stress:3, stamina:-5, time:30, flag:'diligent' },
-      result:[{ t:'good', m:'내일 아침이 편해질 것이다.' }] },
-  ];
-
-  ev.push({ id:'leave', time:'18:00', loc:'💼 퇴근 시간', desc:leaveDesc, choices:leaveChoices });
-
-  // ── 11. 퇴근길 ──────────────────────────────
-  if (!isRemote) {
-    var goHomeDesc = [
-      { t:'time', m:'[ 06:30 PM ] 퇴근길. 집까지 ' + commuteMin + '분.' },
+    var choices = [
+      { label:'▶ 대중교통 탑승 (-' + transitCost.toLocaleString() + '원)', type:'normal',
+        effect:{ stress:commuteStress, stamina:commuteStamina, money:-transitCost, time:min },
+        result:[{ t:'story', m:min + '분 후 도착.' }] },
+      { label:'▶ 택시 탑승 (-' + Math.round(min*econ.bus*0.5).toLocaleString() + '원, 빠름)', type:'money',
+        effect:{ stress:Math.max(0,commuteStress-3), money:-Math.round(min*econ.bus*0.5), time:Math.floor(min*0.6) },
+        result:[{ t:'money', m:'택시비 -' + Math.round(min*econ.bus*0.5).toLocaleString() + '원. 편하게 도착.' }] },
     ];
-    if (commuteMin >= 60) goHomeDesc.push({ t:'bad', m:'오늘도 긴 귀갓길이 기다린다.' });
+    if (min >= 30) {
+      choices.push({ label:
+        e.id==='1980' || e.id==='1997' ? '▶ 이동 중 존다' : '▶ 이동 중 업무 처리 (이메일/문서)',
+        type:'normal',
+        effect:{ stress:commuteStress+3, stamina:commuteStamina, money:-transitCost, time:min, flag:'diligent' },
+        result:[{ t:'good', m: e.id==='1980' || e.id==='1997' ? '이동 중 단암. 컴퓨터도 폰도 없는 시대다.' : '이동 중에도 일을 했다. 효율적이다.' }] });
+      choices.push({ label:'▶ 이어폰 끼고 팟캐스트/음악 듣는다', type:'normal',
+        effect:{ stress:commuteStress-4, stamina:commuteStamina, money:-transitCost, time:min },
+        result:[{ t:'good', m:'정신적 여유를 챙겼다.' }] });
+    }
 
-    var goHomeChoices = [
-      { label:'▶ 바로 귀가', type:'normal',
-        effect:{ stamina:-Math.floor(commuteMin/12), stress:3, money:-econ.bus, time:commuteMin },
-        result:[{ t:'story', m:commuteMin + '분 후 귀가.' }] },
+    var news = getNews(e.id);
+    if (news) {
+      // In this new architecture, we return one event. News can be a side-effect log or a separate slot.
+      // But for simplicity in this refactor, we'll keep it as a desc line if needed, or handle it in the loop.
+      // Actually, the loop handles it if it's a separate slot.
+    }
+
+    var ascii = (e.id === '1980') ? ASCII.BUS : ASCII.COMMUTE;
+    return { id:'commute', loc:(e.id==='1980' ? '🚌' : '🚇') + ' 출근길 (' + min + '분)', ascii: ascii, desc: desc, choices: choices };
+  },
+
+  WORK_AM: function(p, e) {
+    var econ = e.econ;
+    var desc = [
+      { t:'time',  m:'[ 09:00 AM ] 업무 시작. (' + e.name + ')' },
+      { t:'story', m:'오늘 하루 업무를 시작한다.' },
+    ];
+    if (e.id==='1980') desc.push({ t:'system', m:'부장님: "정신 차리고 빠릿빠릿 하게 움직여!"' });
+    if (e.id==='1997') desc.push({ t:'bad', m:'구조조정 소문이 오늘도 돌고 있다...' });
+    if (e.id==='2026') desc.push({ t:'story', m:'ChatGPT로 초안 작업... AI 덕분에 빠르다.' });
+    if (p.job.id==='dismissed') desc.push({ t:'bad', m:'오늘도 구직 사이트를 열었다. 연락이 없다.' });
+
+    var choices = [
+      { label:'▶ 집중 모드 (2시간 몰입)', type:'normal',
+        effect:{ stress:8, stamina:-12, time:120, flag:'diligent', money: p.employType.id==='parttime' ? p.job.dailyPay*2 : 0 },
+        result:[{ t:'good', m:'오전 업무 처리 완료. 효율적이었다.' }] },
+      { label:'▶ 커피 먹고 천천히 시작 (-' + econ.coffee.toLocaleString() + '원)', type:'normal',
+        effect:{ stress:3, stamina:5, money:-econ.coffee, time:130 },
+        result:[{ t:'story', m:'커피로 정신을 차리고 시작했다.' }] },
+      { label: e.id==='1980' ? '▶ 동료랑 잡담하다 오전이 감' :
+               e.id==='1997' ? '▶ 삐삐 확인하고 공중전화 다니다가 감' :
+               e.id==='2000' ? '▶ 버디버디/싸이월드 하다가 점심 됨' :
+               e.id==='2010' ? '▶ 카카오톡/트위터 보다 오전이 증발' :
+               '▶ 인스타/유튜브 쇼츠 보다 오전이 증발', type:'bad',
+        effect:{ stress:-5, time:120 },
+        result:[{ t:'bad', m: e.id==='1980' ? '잡담으로 오전이 날아갔다.' :
+                               e.id==='1997' ? '삐삐 뚜뚜뚜... 공중전화 다니느라 오전이 갔다.' :
+                               e.id==='2000' ? '싸이월드 방명록 달고 버디버디 채팅하다 시간이 갔다.' :
+                               e.id==='2010' ? '카톡 단톡방이 울렸다. 답장하다 오전이 증발했다.' :
+                               '알고리즘에 빠졌다. 쇼츠 10분이 1시간이 됐다.' }] },
+      { label:'▶ 동료와 잡담하며 시간 보냄', type:'normal',
+        effect:{ stress:-8, stamina:-3, time:120, flag:'socialLunch' },
+        result:[{ t:'story', m:'수다로 시간이 날아갔다. 스트레스는 풀렸다.' }] },
+    ];
+    if (p.job.id==='selfemploy' || p.job.id==='restaurant') {
+      choices.push({ label:'▶ 가게 마케팅/홍보에 집중', type:'money', effect:{ stress:10, stamina:-8, money:Math.floor(econ.wage*0.03), time:120 }, result:[{ t:'money', m:'마케팅 효과! 추가 매출 +' + Math.floor(econ.wage*0.03).toLocaleString() + '원' }] });
+    }
+    if (e.id==='1997' && p.job.id==='dismissed') {
+      choices.push({ label:'▶ 오전 내내 취업 면접을 본다', type:'history', effect:{ stress:15, stamina:-10, time:180, flag:'job_hunt' }, result:[{ t:'story', m:'면접을 3개나 봤다. 지쳐도 계속해야 한다.' }] });
+    }
+    if (e.id==='2026') {
+      choices.push({ label:'▶ AI 도구로 업무 자동화 세팅한다', type:'normal', effect:{ stress:-2, time:150, flag:'ai_user', money:20000 }, result:[{ t:'good', m:'AI 자동화 세팅 완료. 다음 주 업무가 줄어들 것이다.' }] });
+    }
+
+    var ascii = (e.id === '1980') ? ASCII.FACTORY : ASCII.WORKING;
+    return { id:'morning_work', loc:'💼 ' + p.company.label, ascii: ascii, desc: desc, choices: choices };
+  },
+
+  LUNCH: function(p, e) {
+    var econ = e.econ;
+    var desc = [{ t:'time',  m:'[ 12:00 PM ] 점심 시간!' }];
+    if (e.id==='1980') desc.push({ t:'system', m:'구내식당 밥값: ' + econ.jajangmyeon + '원' });
+    if (e.id==='1997') desc.push({ t:'bad', m:'요즘 직장인들이 편의점 도시락으로 끼니를 해결한다.' });
+
+    var choices = [
+      { label:'▶ 동료들과 외식 (-' + econ.jajangmyeon.toLocaleString() + '원)', type:'normal',
+        effect:{ stress:-10, stamina:15, money:-econ.jajangmyeon, time:60, flag:'socialLunch' },
+        result:[ { t:'good', m:'맛있는 점심 + 수다로 오후 활력 충전!' }, { t:'npc', m:'동료: "요즘 팀장님 많이 예민하시지 않아요?" (뒷담화 시작)' } ] },
+      { label:'▶ 혼밥 (-' + Math.round(econ.jajangmyeon*0.6).toLocaleString() + '원)', type:'normal', effect:{ stress:2, stamina:10, money:-Math.round(econ.jajangmyeon*0.6), time:30 }, result:[{ t:'story', m:'조용한 혼밥. 30분이 남는다.' }] },
+      { label:'▶ 도시락 (절약!)', type:'money', effect:{ stress:-2, stamina:12 }, result:[{ t:'good', m:'준비해온 도시락. 건강하고 경제적!' }] },
+      { label:'▶ 점심 건너뜀 (절약 + 다이어트)', type:'bad', effect:{ stress:5, stamina:-15 }, result:[{ t:'bad', m:'배가 고프다... 오후에 집중이 안 될 것 같다.' }] },
+    ];
+    if (e.id === '2020' || e.id === '2026') {
+      choices.push({ label:'▶ 배달앱으로 시켜먹기 (-' + Math.round(econ.jajangmyeon*1.4).toLocaleString() + '원)', type:'normal', effect:{ stress:-3, stamina:12, money:-Math.round(econ.jajangmyeon*1.4), time:40 }, result:[{ t:'story', m:'배달앱 클릭 한 번에 배달. -' + Math.round(econ.jajangmyeon*1.4).toLocaleString() + '원' }] });
+    } else if (e.id === '2010') {
+      choices.push({ label:'▶ 전화로 배달 시켜먹기 (-' + Math.round(econ.jajangmyeon*1.3).toLocaleString() + '원)', type:'normal', effect:{ stress:-2, stamina:11, money:-Math.round(econ.jajangmyeon*1.3), time:40 }, result:[{ t:'story', m:'전화 배달. 배달앱은 아직 생소하다.' }] });
+    } else if (e.id === '1997' || e.id === '2000') {
+      choices.push({ label:'▶ 전화로 짜장면 배달 (-' + Math.round(econ.jajangmyeon*1.2).toLocaleString() + '원)', type:'normal', effect:{ stress:-2, stamina:11, money:-Math.round(econ.jajangmyeon*1.2), time:40 }, result:[{ t:'story', m:'전화로 야... (5분 뒤) 배달직 아저씨가 온다!' }] });
+    }
+    if (e.id==='1980') {
+      choices.push({ label:'▶ 구내식당 정식 먹는다', type:'normal', effect:{ stamina:18, money:-econ.jajangmyeon, stress:-5, time:30 }, result:[{ t:'good', m:'구내식당 따끈한 정식.' }] });
+    }
+    if (e.id==='2020') {
+      choices.push({ label:'▶ [코로나] 칸막이 혼밥 식당', type:'normal', effect:{ stamina:10, money:-econ.jajangmyeon, stress:5, time:30 }, result:[{ t:'story', m:'칸막이 설치된 식당.' }] });
+    }
+    return { id:'lunch', loc:'🍱 점심 시간', ascii: ASCII.LUNCH, desc: desc, choices: choices };
+  },
+
+  WORK_PM: function(p, e) {
+    var econ = e.econ;
+    var desc = [{ t:'time',  m:'[ 02:00 PM ] 점심 식곤증과 싸우는 오후.' }];
+    if (e.id==='1997') desc.push({ t:'bad', m:'오늘 구조조정 명단이 또 나왔다는 소문이 돈다.' });
+    if (e.id==='2026') desc.push({ t:'story', m:'AI 리포트 초안이 나왔다. 내가 할 일이 줄고 있다...' });
+    if (e.id==='2020') desc.push({ t:'story', m:'오후 화상회의 3개. 실제 회의보다 피곤하다.' });
+
+    var choices = [
+      { label:'▶ 집중 업무 처리', type:'normal',
+        effect:{ stress:8, stamina:-12, time:90, flag:'diligent', money: p.employType.id==='parttime' ? Math.floor(p.job.dailyPay*1.5) : 0 },
+        result:[{ t:'good', m:'오후 업무 완수. 퇴근이 가까워진다.' }] },
+      { label:'▶ 졸음과 싸우며 겨우 버틴다', type:'bad', effect:{ stress:5, stamina:-8, time:90 }, result:[{ t:'bad', m:'극도의 졸음. 어떻게든 버텼다.' }] },
+      { label:'▶ 화장실 10분 쉬는 타임', type:'normal', effect:{ stress:-5, stamina:5, time:100 }, result:[{ t:'inner', m:'\'화장실이 유일한 안식처...\'' }] },
+      { label:'▶ 아메리카노로 버팀 (-' + econ.coffee.toLocaleString() + '원)', type:'normal', effect:{ stress:-3, stamina:8, money:-econ.coffee, time:95 }, result:[{ t:'story', m:'카페인으로 졸음을 이겼다.' }] },
+      { label:'▶ 팀장한테 잘 보이려고 적극적으로 일한다', type:'normal', effect:{ stress:12, stamina:-15, time:90, flag:'diligent', money:30000 }, result:[{ t:'good', m:'팀장의 눈에 띄었다. "수고해요" 한 마디가 힘이 된다.' }] },
+    ];
+    return { id:'afternoon_work', loc:'💼 오후 업무', desc: desc, choices: choices };
+  },
+
+  LEAVE: function(p, e) {
+    var econ = e.econ;
+    var desc = [{ t:'time',  m:'[ 06:00 PM ] 퇴근 시간이다!' }];
+    if (e.id==='1980') desc.push({ t:'system', m:'부장님이 아직 자리에 있다...' });
+    if (e.id==='1997') desc.push({ t:'bad', m:'오늘도 살아남았다. 내일은 어떨지 모른다.' });
+    if (e.id==='2010') desc.push({ t:'bad', m:'카카오톡에 메시지가 왔다. 퇴근 전 업무 요청인가...' });
+
+    var choices = [
+      { label:'▶ 칼퇴근 (6시 정각)', type:'normal', effect:{ stress:-5, money: p.employType.id==='parttime' ? Math.floor(p.job.dailyPay*2) : 0 }, result:[{ t:'good', m:'칼퇴! 자유다!!!' }] },
+      { label:'▶ 30분 눈치 보다 퇴근', type:'bad', effect:{ stress:8, stamina:-5, time:30 }, result:[{ t:'story', m:'30분 눈치 추가. 피곤하다.' }] },
+      { label:'▶ 야근 2시간 (+' + Math.round(p.job.dailyPay*0.5).toLocaleString() + '원)', type:'money',
+        effect:{ stress:18, stamina:-15, time:120, flag:'overtime', money: Math.round(p.job.dailyPay*0.5) },
+        result:[ { t:'bad', m:'야근 시작...' }, { t:'money', m:'야근수당 +' + Math.round(p.job.dailyPay*0.5).toLocaleString() + '원' } ] },
+      { label:'▶ 퇴근 전 동료와 커피 (-' + econ.coffee.toLocaleString() + '원)', type:'normal', effect:{ stress:-8, money:-econ.coffee, time:20 }, result:[{ t:'good', m:'퇴근 전 커피 타임. 소소한 행복.' }] },
+      { label:'▶ 내일 일거리를 미리 정리하고 퇴근', type:'normal', effect:{ stress:3, stamina:-5, time:30, flag:'diligent' }, result:[{ t:'good', m:'내일 아침이 편해질 것이다.' }] },
+    ];
+    return { id:'leave', loc:'💼 퇴근 시간', desc: desc, choices: choices };
+  },
+
+  GO_HOME: function(p, e) {
+    var min = p.home.commute;
+    var econ = e.econ;
+    var desc = [{ t:'time', m:'[ 06:30 PM ] 퇴근길. 집까지 ' + min + '분.' }];
+    if (min >= 60) desc.push({ t:'bad', m:'오늘도 긴 귀갓길이 기다린다.' });
+
+    var choices = [
+      { label:'▶ 바로 귀가', type:'normal', effect:{ stamina:-Math.floor(min/12), stress:3, money:-econ.bus, time:min }, result:[{ t:'story', m:min + '분 후 귀가.' }] },
       { label:'▶ 마트에서 장 보고 간다 (-' + Math.round(econ.jajangmyeon*3.5).toLocaleString() + '원)', type:'family',
-        effect:{ stamina:-8, money:-Math.round(econ.jajangmyeon*3.5), time:commuteMin+30, rel_sp:6 },
-        result:[
-          { t:'money', m:'장 봤다. -' + Math.round(econ.jajangmyeon*3.5).toLocaleString() + '원' },
-        ].concat(p.hasSpouse ? [{ t:'relation', m:'배우자가 좋아한다.' }] : []) },
-      { label:'▶ 헬스장 들렀다 간다 (-' + Math.round(econ.coffee*1.5).toLocaleString() + '원)', type:'normal',
-        effect:{ stress:-12, stamina:15, money:-Math.round(econ.coffee*1.5), time:commuteMin+70 },
-        result:[{ t:'good', m:'운동으로 스트레스 해소!' }] },
+        effect:{ stamina:-8, money:-Math.round(econ.jajangmyeon*3.5), time:min+30, rel_sp:6 },
+        result:[ { t:'money', m:'장 봤다. -' + Math.round(econ.jajangmyeon*3.5).toLocaleString() + '원' } ].concat(p.hasSpouse ? [{ t:'relation', m:'배우자가 좋아한다.' }] : []) },
+      { label:'▶ 헬스장 들렀다 간다 (-' + Math.round(econ.coffee*1.5).toLocaleString() + '원)', type:'normal', effect:{ stress:-12, stamina:15, money:-Math.round(econ.coffee*1.5), time:min+70 }, result:[{ t:'good', m:'운동으로 스트레스 해소!' }] },
       { label:'▶ 동료들과 술 한 잔 (-' + Math.round(econ.jajangmyeon*3).toLocaleString() + '원)', type:'normal',
-        effect:{ stress:-18, stamina:-12, money:-Math.round(econ.jajangmyeon*3), time:commuteMin+90,
-          rel_sp: p.hasSpouse ? -5 : 0 },
-        result:[
-          { t:'good', m:'시원한 맥주 한 잔. -' + Math.round(econ.jajangmyeon*3).toLocaleString() + '원' },
-        ].concat(p.hasSpouse ? [{ t:'bad', m:'귀가가 늦어진다. 배우자가 걱정할 것 같다.' }] : []) },
+        effect:{ stress:-18, stamina:-12, money:-Math.round(econ.jajangmyeon*3), time:min+90, rel_sp: p.hasSpouse ? -5 : 0 },
+        result:[ { t:'good', m:'시원한 맥주 한 잔. -' + Math.round(econ.jajangmyeon*3).toLocaleString() + '원' } ].concat(p.hasSpouse ? [{ t:'bad', m:'귀가가 늦어진다.' }] : []) },
     ];
-    // 중고거래: 시대별 분기
-    if (eraId === '2020' || eraId === '2026') {
-      goHomeChoices.push({ label:'▶ 당근마켓 직거래 (+30,000원)', type:'money',
-        effect:{ money:30000, time:commuteMin+20, stamina:-3 },
-        result:[{ t:'money', m:'당근 거래 완료! +30,000원' }] });
-    } else if (eraId === '2010') {
-      goHomeChoices.push({ label:'▶ 중고나라 직거래 (+25,000원)', type:'money',
-        effect:{ money:25000, time:commuteMin+25, stamina:-3 },
-        result:[{ t:'money', m:'중고나라 거래 완료! +25,000원' }] });
-    } else if (eraId === '2000') {
-      goHomeChoices.push({ label:'▶ 네이버 카페 중고거래 (+20,000원)', type:'money',
-        effect:{ money:20000, time:commuteMin+25, stamina:-3 },
-        result:[{ t:'money', m:'인터넷 중고거래 완료! +20,000원' }] });
-    }
-    if (eraId === '1997') {
-      goHomeChoices.push({ label:'▶ 금 모으기 운동 참여 후 귀가', type:'history',
-        effect:{ money:-50000, stress:-3, flag:'patriot', time:commuteMin+30 },
-        result:[{ t:'history', m:'금 헌납 참여. 나라를 위해 내가 할 수 있는 일을 했다.' }] });
-    }
+    if (e.id === '2020' || e.id === '2026') choices.push({ label:'▶ 당근마켓 직거래 (+30,000원)', type:'money', effect:{ money:30000, time:min+20, stamina:-3 }, result:[{ t:'money', m:'당근 거래 완료! +30,000원' }] });
+    if (e.id === '1997') choices.push({ label:'▶ 금 모으기 운동 참여 후 귀가', type:'history', effect:{ money:-50000, stress:-3, flag:'patriot', time:min+30 }, result:[{ t:'history', m:'금 헌납 참여. 나라를 위해...' }] });
 
-    ev.push({ id:'go_home', time:'18:30', loc:'🚇 퇴근길', desc:goHomeDesc, choices:goHomeChoices });
+    return { id:'go_home', loc:'🚇 퇴근길', desc: desc, choices: choices };
+  },
+
+  CHORES: function(p, e) {
+    var econ = e.econ;
+    var desc = [{ t:'time',  m:'[ 07:30 PM ] 집에 도착했다.' }, { t:'story', m:'소파에 쓰러지고 싶다. 하지만 집안일이 기다린다.' }];
+    if (p.hasSpouse) desc.push({ t:'npc', m:'배우자: "왔어? 집안일 좀 도와줄 수 있어?"' });
+
+    var choices = [
+      { label:'▶ 설거지 + 빨래 처리', type:'family', effect:{ stamina:-8, time:35, rel_sp:12, choreDone:['dishes','laundry'] }, result:[ { t:'good', m:'설거지 + 빨래 완료!' } ].concat(p.hasSpouse ? [{ t:'relation', m:'배우자 친밀도 +12' }] : []) },
+      { label:'▶ 저녁 요리를 직접 한다', type:'family', effect:{ stamina:-10, time:45, money:-Math.floor(econ.jajangmyeon*1.5), rel_sp:15, rel_kid:8, choreDone:['cook'] }, result:[ { t:'good', m:'집밥 완성! 가족이 행복해한다.' }, { t:'relation', m:'가족 관계 크게 상승!' } ] },
+      { label:'▶ 일단 쉰다... (피곤)', type:'bad', effect:{ stamina:10, stress:-5, rel_sp:-5, chorePending:['dishes','laundry'] }, result:[{ t:'bad', m:'집안일을 미뤘다. 배우자의 한숨 소리...' }] },
+    ];
+    return { id:'chores', loc:'🏠 집 — 귀가 후', ascii: ASCII.CHORES, desc: desc, choices: choices };
+  },
+
+  NIGHT: function(p, e) {
+    var econ = e.econ;
+    var desc = [{ t:'time',  m:'[ 10:00 PM ] 하루가 끝나간다.' }, { t:'story', m:'오늘 하루를 어떻게 마무리할까?' }];
+    var choices = [
+      { label:'▶ 일찍 잠든다 (숙면)', type:'normal', effect:{ stamina:25, stress:-8, flag:'earlyBed' }, result:[{ t:'good', m:'현명한 선택. 내일을 위한 충전!' }] },
+      { label: e.id==='1980' ? '▶ TV 연속극 보다 잔다' :
+               e.id==='1997' ? '▶ 비디오 빌려와서 보다 잔다' :
+               e.id==='2000' ? '▶ 싸이월드 꾸미고 버디버디 하다가 잔다' :
+               e.id==='2010' ? '▶ 카카오톡/트위터 보다가 잔다' :
+               '▶ 넷플릭스/유튜브 보다 잔다', type:'normal',
+        effect:{ stress:-15, stamina:-5 },
+        result:[{ t:'story', m: e.id==='1980' ? '주말의 명화... 밤이 깊어간다.' :
+                                 e.id==='1997' ? '비디오 한 편. 현실을 잊었다.' :
+                                 e.id==='2000' ? '싸이월드 방명록 달고 잔다.' :
+                                 e.id==='2010' ? '카톡 보다가 새벽 1시.' :
+                                 '알고리즘에 빠졌다.' }] },
+      { label:'▶ 가벼운 스트레칭 후 취침', type:'normal', effect:{ stamina:15, stress:-5 }, result:[{ t:'good', m:'몸이 한결 가볍다. 좋은 밤.' }] },
+    ];
+    if (p.hasSpouse) choices.push({ label:'▶ 배우자와 오늘 하루 이야기 나눈다', type:'family', effect:{ stress:-18, rel_sp:12, time:45 }, result:[ { t:'npc', m:'배우자: "오늘도 수고했어."' }, { t:'relation', m:'서로의 하루를 공유한 소중한 시간.' } ] });
+    if (p.hasKid) choices.push({ label:'▶ 아이에게 책 읽어준다', type:'family', effect:{ stress:-10, rel_kid:15, stamina:-3, time:30, flag:'goodParent' }, result:[ { t:'npc', m:'아이: "또 읽어줘! 더 읽어줘~"' }, { t:'relation', m:'아이와의 소중한 시간.' } ] });
+    if (e.id==='1980') choices.push({ label:'▶ TV 앞에서 가족 모두 9시 뉴스를 본다', type:'family', effect:{ stress:-8, rel_sp:5, rel_kid:5 }, result:[{ t:'good', m:'TV 뉴스 앞에 온 가족이 모인다.' }] });
+    if (e.id==='2026') choices.push({ label:'▶ AI로 내일 계획을 짜본다', type:'normal', effect:{ stress:-5, flag:'ai_planner' }, result:[{ t:'good', m:'AI가 내일 스케줄을 최적화해줬다.' }] });
+
+    return { id:'night', loc:'🏠 취침 전', ascii: ASCII.HOME_EVENING, desc: desc, choices: choices };
+  },
+};
+
+function getRandomFromPool(key, p, e) {
+  var pool = [];
+  if (key === 'COMMUTE_RANDOM') return getCommuteRandomEvent(p, e, p.home.commute);
+  if (key === 'MORNING_RANDOM') pool = getMorningPool(p, e);
+  if (key === 'AFTERNOON_RANDOM') pool = getAfternoonPool(p, e);
+  if (key === 'FAMILY_RANDOM') pool = getFamilyPool(p, e);
+  if (key === 'INCOME_RANDOM') pool = getIncomePool(p, e);
+  if (key === 'WILDCARD') pool = WILDCARD_POOL;
+  if (pool.length === 0) return null;
+  var item = pool[Math.floor(Math.random() * pool.length)];
+  if (item.title && !item.desc) {
+    return { id:'pool_ev', loc: item.loc || '⚡ 이벤트', desc: [{ t:'event', m:'⚡ ' + item.title }].concat(item.descLines || []), choices: item.choices, ascii: item.ascii };
   }
-
-  // ── 12. 귀가 후 집안일 ──────────────────────
-  var choresDesc = [
-    { t:'time',  m:'[ 07:30 PM ] 집에 도착했다.' },
-    { t:'story', m:'소파에 쓰러지고 싶다. 하지만 집안일이 기다린다.' },
-  ];
-  if (p.hasSpouse) choresDesc.push({ t:'npc', m:'배우자: "왔어? 집안일 좀 도와줄 수 있어?"' });
-
-  var choresChoices = [
-    { label:'▶ 설거지 + 빨래 처리', type:'family',
-      effect:{ stamina:-8, time:35, rel_sp:12, choreDone:['dishes','laundry'] },
-      result:[
-        { t:'good', m:'설거지 + 빨래 완료!' },
-      ].concat(p.hasSpouse ? [{ t:'relation', m:'배우자 친밀도 +12' }] : []) },
-    { label:'▶ 저녁 요리를 직접 한다', type:'family',
-      effect:{ stamina:-10, time:45, money:-Math.floor(econ.jajangmyeon*1.5), rel_sp:15, rel_kid:8, choreDone:['cook'] },
-      result:[
-        { t:'good', m:'집밥 완성! 가족이 행복해한다.' },
-        { t:'relation', m:'가족 관계 크게 상승!' }
-      ] },
-    { label:'▶ 청소기 + 분리수거', type:'family',
-      effect:{ stamina:-7, time:30, rel_sp:10, choreDone:['vacuum','trash'] },
-      result:[{ t:'good', m:'청소 완료! 집이 쾌적해졌다.' }] },
-    { label:'▶ 일단 쉰다... (피곤)', type:'bad',
-      effect:{ stamina:10, stress:-5, rel_sp:-5, chorePending:['dishes','laundry'] },
-      result:[{ t:'bad', m:'집안일을 미뤘다. 배우자의 한숨 소리...' }] },
-    { label:'▶ 배달 시키고 전부 쉰다 (-' + Math.round(econ.jajangmyeon*2).toLocaleString() + '원)', type:'normal',
-      effect:{ stamina:5, money:-Math.round(econ.jajangmyeon*2), rel_sp:2 },
-      result:[{ t:'story', m:'배달 주문. 몸은 편하지만 지출이 아프다.' }] },
-    { label:'▶ 마트 장 보고 요리한다 (-' + Math.round(econ.jajangmyeon*1.8).toLocaleString() + '원)', type:'family',
-      effect:{ stamina:-12, time:60, money:-Math.round(econ.jajangmyeon*1.8), rel_sp:18, rel_kid:10, choreDone:['shop','cook'] },
-      result:[
-        { t:'good', m:'장 봐서 요리까지 했다. 완벽한 집안일 처리!' },
-        { t:'relation', m:'가족 관계 최상승!' }
-      ] },
-  ];
-
-  ev.push({ id:'chores', time:'19:30', loc:'🏠 집 — 귀가 후', ascii: ASCII.CHORES, desc:choresDesc, choices:choresChoices });
-
-  // ── 13. 가족 이벤트 ──────────────────────────
-  var familyPool = getFamilyPool(p, e);
-  if (familyPool.length > 0) {
-    var fe = familyPool[Math.floor(Math.random()*familyPool.length)];
-    ev.push({
-      id:'family', time:'20:00', loc:'🏠 가족 시간',
-      desc:[ { t:'time', m:'[ 08:00 PM ] 저녁 후 가족 시간.' }, { t:'event', m:'💬 ' + fe.title } ].concat(fe.descLines),
-      choices: fe.choices.filter(function(c) { return !c.condition || c.condition(p); })
-    });
-  }
-
-  // ── 14. 저녁 부업/수익 이벤트 ────────────────
-  var incomePool = getIncomePool(p, e);
-  if (incomePool.length > 0) {
-    var ie = incomePool[Math.floor(Math.random()*incomePool.length)];
-    ev.push({
-      id:'income', time:'21:00', loc:'📱 저녁 — 수익/부업',
-      choices: ie.choices
-    });
-  }
-
-  // [New] Philosophical Moment - Evening
-  var philEvening = getPhilosophicalMoment(p, e, 'evening');
-  if (philEvening) {
-    ev.push({
-      id:'phil_evening', time:'21:30', loc:'💭 밤 — 깊은 생각',
-      desc:[ { t:'time', m:'[ 09:30 PM ] 하루를 마무리하며...' } ].concat(philEvening.descLines),
-      choices: philEvening.choices
-    });
-  }
-
-  // ── 15. 취침 전 ──────────────────────────────
-  var nightChoices = [
-    { label:'▶ 일찍 잠든다 (숙면)', type:'normal',
-      effect:{ stamina:25, stress:-8, flag:'earlyBed' },
-      result:[{ t:'good', m:'현명한 선택. 내일을 위한 충전!' }] },
-    { label: eraId==='1980' ? '▶ TV 연속극 보다 잔다' :
-             eraId==='1997' ? '▶ 비디오 빌려와서 보다 잔다' :
-             eraId==='2000' ? '▶ 싸이월드 꾸미고 버디버디 하다가 잔다' :
-             eraId==='2010' ? '▶ 카카오톡/트위터 보다가 잔다' :
-             '▶ 넷플릭스/유튜브 보다 잔다', type:'normal',
-      effect:{ stress:-15, stamina:-5 },
-      result:[{ t:'story', m: eraId==='1980' ? '주말의 명화... 밤이 깊어간다.' :
-                               eraId==='1997' ? '비디오 한 편. 현실을 잊었다.' :
-                               eraId==='2000' ? '싸이월드 방명록에 글 남기고 자야지... 버디버디 알림이 울린다.' :
-                               eraId==='2010' ? '카톡 단톡방이 시끄럽다. 결국 새벽 1시.' :
-                               '알고리즘에 빠져 어느새 새벽 1시다.' }] },
-    { label:'▶ 내일 걱정하며 뒤척인다', type:'bad',
-      effect:{ stress:12, stamina:-8 },
-      result:[{ t:'bad', m:'내일 회의, 돈 걱정... 잠이 안 온다.' }] },
-    { label:'▶ 가계부 정리한다', type:'money',
-      effect:{ stress:3, flag:'budgetCheck' },
-      result:[{ t:'money', m:'지출 확인 완료. 오늘 얼마 썼나...' }] },
-    { label:'▶ 가볍게 스트레칭 후 취침', type:'normal',
-      effect:{ stamina:15, stress:-5 },
-      result:[{ t:'good', m:'몸이 한결 가볍다. 좋은 밤.' }] },
-  ];
-  if (p.hasSpouse) {
-    nightChoices.push({ label:'▶ 배우자와 오늘 하루 이야기 나눈다', type:'family',
-      effect:{ stress:-18, rel_sp:12, time:45 },
-      result:[
-        { t:'npc', m:'배우자: "오늘도 수고했어."' },
-        { t:'relation', m:'서로의 하루를 공유한 소중한 시간.' }
-      ] });
-  }
-  if (p.hasKid) {
-    nightChoices.push({ label:'▶ 아이에게 책 읽어준다', type:'family',
-      effect:{ stress:-10, rel_kid:15, stamina:-3, time:30, flag:'goodParent' },
-      result:[
-        { t:'npc', m:'아이: "또 읽어줘! 더 읽어줘~"' },
-        { t:'relation', m:'아이와의 소중한 시간.' }
-      ] });
-  }
-  if (eraId==='1980') {
-    nightChoices.push({ label:'▶ TV 앞에서 가족 모두 9시 뉴스를 본다', type:'family',
-      effect:{ stress:-8, rel_sp:5, rel_kid:5 },
-      result:[{ t:'good', m:'TV 뉴스 앞에 온 가족이 모인다. 1980년대의 낭만.' }] });
-  }
-  if (eraId==='2026') {
-    nightChoices.push({ label:'▶ AI로 내일 계획을 짜본다', type:'normal',
-      effect:{ stress:-5, flag:'ai_planner' },
-      result:[{ t:'good', m:'AI가 내일 스케줄을 최적화해줬다.' }] });
-  }
-
-  ev.push({ id:'night', time:'22:00', loc:'🏠 취침 전', ascii: ASCII.HOME_EVENING, desc:[
-    { t:'time',  m:'[ 10:00 PM ] 하루가 끝나간다.' },
-    { t:'story', m:'오늘 하루를 어떻게 마무리할까?' },
-  ], choices:nightChoices });
-
-  return ev;
+  return item;
 }
 
-// ── 오전 이벤트 풀 ──────────────────────────────────
+function getCommuteRandomEvent(p, e, min) {
+  var econ = e.econ;
+  var eraId = e.id;
+  var pool = [
+    { title: '⚡ 지하철 연착', desc: [{ t:'bad', m:'지하철이 연착됐다! 신호 장애.' }],
+      choices: [
+        { label:'▶ 기다린다', type:'bad', effect:{ stress:8, time:12 }, result:[{ t:'bad', m:'12분 지연.' }] },
+        { label:'▶ 버스로 우회', type:'normal', effect:{ stress:5, money:-econ.bus, time:8 }, result:[{ t:'story', m:'버스로 갔다.' }] },
+      ]
+    },
+    { title: '☕ 커피 1+1 행사!', desc: [{ t:'event', m:'편의점에서 커피 1+1 행사 중! 아메리카노 ' + econ.coffee.toLocaleString() + '원.' }],
+      choices: [
+        { label:'▶ 2잔 산다 (1잔은 동료 선물)', type:'money', effect:{ stress:-5, stamina:8, money:-econ.coffee, time:5, flag:'kind' }, result:[{ t:'good', m:'동료 커피까지 챙겼다.' }] },
+        { label:'▶ 내 것만 1잔', type:'normal', effect:{ stress:-3, stamina:6, money:-econ.coffee, time:5 }, result:[{ t:'story', m:'커피 한 잔.' }] },
+        { label:'▶ 지나친다 (절약)', type:'normal', effect:{ stress:2 }, result:[{ t:'inner', m:'\'참아야 해...\'' }] },
+      ]
+    },
+    { title: '👜 길에서 지갑 발견', desc: [{ t:'event', m:'지갑이 떨어져 있다.' }],
+      choices: [
+        { label:'▶ 경찰서 신고', type:'normal', effect:{ stress:3, time:15, flag:'honest' }, result:[{ t:'good', m:'양심적인 행동.' }] },
+        { label:'▶ 모른 척 지나간다', type:'bad', effect:{ stress:5 }, result:[{ t:'inner', m:'찜찜한 하루 시작.' }] },
+      ]
+    },
+    { title: '🌧️ 갑자기 비가 온다', desc: [{ t:'bad', m:'예보 없이 비가 쏟아진다!' }],
+      choices: [
+        { label:'▶ 편의점 우산 산다 (-' + Math.round(econ.coffee*0.8).toLocaleString() + '원)', type:'money', effect:{ money:-Math.round(econ.coffee*0.8), stress:3 }, result:[{ t:'story', m:'우산 구입 완료.' }] },
+        { label:'▶ 그냥 뛰어간다', type:'bad', effect:{ stress:10, stamina:-8 }, result:[{ t:'bad', m:'흠뻑 젖었다.' }] },
+        { label:'▶ 비 그치길 기다린다 (+10분)', type:'normal', effect:{ stress:5, time:10 }, result:[{ t:'story', m:'잠깐 기다렸다.' }] },
+      ]
+    }
+  ];
+
+  if (eraId === '1980') {
+    pool.push({ title: '🚌 버스가 초만원', desc: [{ t:'bad', m:'아침 버스가 사람으로 꽉 찼다.' }],
+      choices: [
+        { label:'▶ 억지로 탄다', type:'bad', effect:{ stress:10, stamina:-5, money:-econ.bus, time:min }, result:[{ t:'bad', m:'꼼짝 못 하고 도착했다.' }] },
+        { label:'▶ 다음 버스 기다린다 (+15분)', type:'normal', effect:{ stress:5, money:-econ.bus, time:min+15 }, result:[{ t:'story', m:'여유롭게 다음 버스에 탔다.' }] },
+      ]
+    });
+  }
+  if (eraId === '2026') {
+    pool.push({ title: '🚇 GTX 앱 오류', desc: [{ t:'bad', m:'앱에서 GTX 예약 오류가 났다.' }],
+      choices: [
+        { label:'▶ 고객센터에 전화한다 (+20분)', type:'bad', effect:{ stress:15, time:20 }, result:[{ t:'bad', m:'연결까지 20분.' }] },
+        { label:'▶ 일반 전철로 우회한다', type:'normal', effect:{ stress:8, money:-econ.bus, time:30 }, result:[{ t:'story', m:'돌아가는 길.' }] },
+      ]
+    });
+  }
+
+  var item = pool[Math.floor(Math.random() * pool.length)];
+  return { id:'comm_ev', loc:'🚇 출근길 — 돌발', desc:[{ t:'time', m:'[ 08:10 AM ] 출근길 돌발 상황!' }].concat(item.desc), choices:item.choices };
+}
+
+
 function getMorningPool(p, e) {
   var econ = e.econ;
   var pool = [];
