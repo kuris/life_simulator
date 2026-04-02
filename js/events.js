@@ -569,7 +569,7 @@ function getMorningPool(p, e) {
   });
 
   // 중고거래 플랫폼: 시대별 분기
-  if (eraId === '2020' || eraId === '2026') {
+  if (e.id === '2020' || e.id === '2026') {
     pool.push({
       title:'📦 당근마켓 문의',
       descLines: [{ t:'story', m:'중고 거래 문의가 왔다.' }],
@@ -578,7 +578,7 @@ function getMorningPool(p, e) {
         { label:'▶ 내일로 미룬다', type:'normal', effect:{}, result:[{ t:'story', m:'내일 하기로 했다.' }] },
       ]
     });
-  } else if (eraId === '2010') {
+  } else if (e.id === '2010') {
     pool.push({
       title:'💻 중고나라 직거래 문의',
       descLines: [{ t:'story', m:'중고나라 쪽지가 왔다.' }],
@@ -587,7 +587,7 @@ function getMorningPool(p, e) {
         { label:'▶ 내일로 미룬다', type:'normal', effect:{}, result:[{ t:'story', m:'내일 하기로 했다.' }] },
       ]
     });
-  } else if (eraId === '2000') {
+  } else if (e.id === '2000') {
     pool.push({
       title:'💻 네이버 카페 중고거래',
       descLines: [{ t:'story', m:'인터넷 카페에 올린 물건 문의가 왔다.' }],
