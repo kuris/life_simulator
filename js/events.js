@@ -1209,13 +1209,16 @@ var NARRATIVE_CORE_POOL = {
             { t:'story', m:'밤샘 작업 끝에 컨테이너가 출발한다. 태극기를 단 트럭이 멀어진다.' }
           ],
           choices: [
-            { label:'▶ 뿌듯함에 젖어 담배 한 대', type:'normal', effect:{ stress:-15, money:-e.econ.cigarette }, result:[{ t:'good', m:'이게 나라를 세우는 맛이지.' }] },
+            { label:'▶ 뿌듯함에 젖어 담배 한 대', type:'normal', effect:{ stress:-15, money:-200 }, result:[{ t:'good', m:'이게 나라를 세우는 맛이지.' }] },
             { label:'▶ 그대로 바닥에 쓰러져 잠든다', type:'bad', effect:{ stamina:20, time:120 }, result:[{ t:'story', m:'기절하듯 잠들었다. 훈장보다 잠이 달콤하다.' }] }
           ]
         }
       ]
     }
-  ]
+  ],
+  '2000': [],
+  '2010': [],
+  '2020': []
 };
 
 function getNews(eraId) {
