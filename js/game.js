@@ -120,6 +120,7 @@ function resumeGame(snap, era) {
   G.eventIdx = snap.eventIdx || 0;
 
   showScreen('game');
+  if (typeof BGM !== 'undefined') BGM.stop(); // 타이틀 음악 중지
   if (typeof BGM !== 'undefined') BGM.play(era.id);
 
   var chip = document.getElementById('game-era-chip');
@@ -139,7 +140,16 @@ function resumeGame(snap, era) {
 }
 
 // 페이지 로드 시 자동 체크
-window.addEventListener('load', function() { setTimeout(checkResume, 500); });
+window.addEventListener('load', function() {
+  setTimeout(checkResume, 500);
+  // 첫 상호작용으로 오디오 컨텍스트 활성화 및 타이틀 음악
+  document.addEventListener('click', startTitleBgm, { once: true });
+});
+
+function startTitleBgm() {
+  if (G.era) return; // 이미 게임 중이면 패스
+  if (typeof BGM !== 'undefined') BGM.play('title');
+}
 
 // ─── 유틸 ────────────────────────────────────────────
 function minToTime(m) {
@@ -675,6 +685,7 @@ function quickStartEra(eraId) {
   G.events = buildDayEvents(G.profile, G.era);
 
   showScreen('game');
+  if (typeof BGM !== 'undefined') BGM.stop(); // 타이틀 음악 중지
   if (typeof SFX !== 'undefined') SFX.play('gameStart');
   if (typeof BGM !== 'undefined') BGM.play(eraId);
 
@@ -1071,6 +1082,7 @@ function initGame() {
   G.events = buildDayEvents(G.profile, G.era);
 
   showScreen('game');
+  if (typeof BGM !== 'undefined') BGM.stop(); // 타이틀 음악 중지
   if (typeof SFX !== 'undefined') SFX.play('gameStart');
   if (typeof BGM !== 'undefined') BGM.play(G.era.id);
 

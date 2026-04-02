@@ -266,7 +266,7 @@ function buildDayEvents(profile, era) {
       result:[{ t:'good', m:'AI 자동화 세팅 완료. 다음 주 업무가 줄어들 것이다.' }] });
   }
 
-  ev.push({ id:'morning_work', time:'09:00', loc:'💼 ' + p.company.label, ascii: ASCII.OFFICE, desc:workDesc, choices:workChoices });
+  ev.push({ id:'morning_work', time:'09:00', loc:'💼 ' + p.company.label, ascii: ASCII.WORKING, desc:workDesc, choices:workChoices });
 
   // ── 06. 오전 랜덤 이벤트 (시대별) ────────────────
   var morningPool = getMorningPool(p, e);
@@ -328,13 +328,13 @@ function buildDayEvents(profile, era) {
       result:[{ t:'story', m:'칸막이 설치된 식당. 낯선 풍경이 이제 익숙해졌다.' }] });
   }
 
-  ev.push({ id:'lunch', time:'12:00', loc:'🍱 점심 시간', desc:lunchDesc, choices:lunchChoices });
+  ev.push({ id:'lunch', time:'12:00', loc:'🍱 점심 시간', ascii: ASCII.LUNCH, desc:lunchDesc, choices:lunchChoices });
 
   // [New] Philosophical Moment - Lunchtime
   var philLunch = getPhilosophicalMoment(p, e, 'lunch');
   if (philLunch) {
     ev.push({
-      id:'phil_lunch', time:'13:00', loc:'💭 식후 — 고찰',
+      id:'phil_lunch', time:'13:00', loc:'💭 식후 — 고찰', ascii: ASCII.COFFEE,
       desc:[ { t:'time', m:'[ 01:00 PM ] 식사를 마치고 짧은 생각.' } ].concat(philLunch.descLines),
       choices: philLunch.choices
     });
@@ -586,7 +586,7 @@ function buildDayEvents(profile, era) {
       result:[{ t:'good', m:'AI가 내일 스케줄을 최적화해줬다.' }] });
   }
 
-  ev.push({ id:'night', time:'22:00', loc:'🏠 취침 전', ascii: ASCII.NIGHT, desc:[
+  ev.push({ id:'night', time:'22:00', loc:'🏠 취침 전', ascii: ASCII.HOME_EVENING, desc:[
     { t:'time',  m:'[ 10:00 PM ] 하루가 끝나간다.' },
     { t:'story', m:'오늘 하루를 어떻게 마무리할까?' },
   ], choices:nightChoices });
@@ -1078,4 +1078,52 @@ function getIncomePool(p, e) {
   }
 
   return pool;
+}
+
+// ───────────────────────────────────────────────
+//  [New] Philosophical Questions — [ 삶의 의미 ]
+// ───────────────────────────────────────────────
+var PHIL_POOL = {
+  morning: [
+    {
+      title: '잠시 생각이 든다',
+      descLines: [ { t:'inner', m:'만원 지하철 안, 창틀에 비친 내 모습을 본다.' }, { t:'story', m:'나는 무엇을 위해 이토록 치열하게 달리고 있을까?' } ],
+      choices: [
+        { label: '▶ 내 가족의 안락한 삶을 위해', effect: { mental:10, flag:'Phil_Altruist' }, result: [ { t:'good', m:'헌신적인 마음이 나를 움직인다.' } ] },
+        { label: '▶ 더 높은 곳, 사회적 성공을 위해', effect: { stress:10, money:10000, flag:'Phil_Materialist' }, result: [ { t:'money', m:'야망이 나를 채찍질한다.' } ] },
+        { label: '▶ 그저 살아있음 그 자체의 증명을 위해', effect: { mental:5, flag:'Phil_Existentialist' }, result: [ { t:'inner', m:'존재한다는 것만으로도 충분하다.' } ] }
+      ]
+    }
+  ],
+  lunch: [
+    {
+      title: '식후 - 고찰',
+      descLines: [ { t:'inner', m:'커피 한 잔의 여유 속, 문득 이런 의문이 든다.' }, { t:'story', m:'행복이란 무엇일까?' } ],
+      choices: [
+        { label: '▶ 고통 없이 평온한 상태', effect: { mental:15, stress:-10, flag:'Phil_Stoic' }, result: [ { t:'good', m:'마음의 평화를 최우선으로 삼는다.' } ] },
+        { label: '▶ 원하는 것을 마음껏 누리는 기쁨', effect: { mental:10, money:-5000, flag:'Phil_Epicurean' }, result: [ { t:'good', m:'현재의 즐거움을 만끽하기로 했다.' } ] },
+        { label: '▶ 남에게 도움이 되는 가치 있는 삶', effect: { relation:10, flag:'Phil_Humanist' }, result: [ { t:'good', m:'함께하는 가치를 다시금 새긴다.' } ] }
+      ]
+    }
+  ],
+  evening: [
+    {
+      title: '하루의 끝에서',
+      descLines: [ { t:'inner', m:'침대에 누워 천장을 바라본다.' }, { t:'story', m:'오늘 하루는 내 인생에 어떤 의미였을까?' } ],
+      choices: [
+        { label: '▶ 내일로 나아가기 위한 디딤돌', effect: { mental:5, flag:'Phil_Stoic' }, result: [ { t:'good', m:'묵묵히 견뎌낸 나를 칭찬한다.' } ] },
+        { label: '▶ 그저 속수무책으로 흘러간 시간', effect: { stress:5, flag:'Phil_Materialist' }, result: [ { t:'inner', m:'가끔은 허무함이 밀려오기도 한다.' } ] },
+        { label: '▶ 내가 직접 선택하고 빚어낸 시간', effect: { mental:10, flag:'Phil_Existentialist' }, result: [ { t:'good', m:'나는 내 삶의 주인임을 느낀다.' } ] }
+      ]
+    }
+  ]
+};
+
+function getPhilosophicalMoment(p, e, timeKey) {
+  var pool = PHIL_POOL[timeKey] || [];
+  if (pool.length === 0) return null;
+  // 30% 확률로 발생
+  if (Math.random() > 0.4) return null;
+  var idx = Math.floor(Math.random() * pool.length);
+  return pool[idx];
 }
