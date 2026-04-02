@@ -1871,64 +1871,88 @@ function mapCsvToScenarios(rows) {
   const header = rows[0];
   const scenarios = [];
 
+  // 컬럼 인덱스 동적 찾기 (대소문자 무관)
+  const findIdx = (key) => header.findIndex(h => h.toLowerCase().includes(key.toLowerCase()));
+  const idx = {
+    id: findIdx('id'), 
+    date: findIdx('date'), 
+    era: findIdx('eraid'), 
+    title: findIdx('title'), 
+    desc: findIdx('desc'), 
+    rec: findIdx('recommend'),
+    time: findIdx('time'), 
+    etitle: findIdx('eventtitle'), 
+    estory: findIdx('eventstory')
+  };
+
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     if (r.length < 3) continue;
 
     try {
-      // 만약 r[0]에 개행이나 쉼표가 포함된 채로 뭉쳐서 들어왔을 경우에 대한 방어 로직
-      // (사용자가 한 셀에 여러 줄을 붙여넣었을 경우 대응)
-      if (r[0].includes('\n') && r.length < 10) {
+      // 비정상적으로 뭉친 데이터 대응 (개행 포함 시)
+      if (r[0].includes('\n') && r.length < 5) {
         const subRows = parseCSV(r[0]);
-        if (subRows.length > 0) {
-           subRows.forEach(sr => {
-             const mapped = mapSingleScenario(sr);
-             if (mapped) scenarios.push(mapped);
-           });
-           continue;
-        }
+        subRows.forEach(sr => {
+          const s = mapSingleScenario(sr, idx);
+          if (s) scenarios.push(s);
+        });
+        continue;
       }
 
-      const s = mapSingleScenario(r);
+      const s = mapSingleScenario(r, idx);
       if (s) scenarios.push(s);
     } catch (err) {
-      console.warn('Row mapping error at row ' + i, err);
+      console.warn('Row ' + i + ' mapping failed:', err);
     }
   }
-  console.log('Successfully loaded ' + scenarios.length + ' scenarios from Sheet.');
   return scenarios;
 }
 
-function mapSingleScenario(r) {
+function mapSingleScenario(r, idx) {
   if (!r || r.length < 5) return null;
   
+  const getValue = (key) => (idx[key] !== -1 ? r[idx[key]] : '') || '';
+  
+  const title = getValue('title');
   const s = {
-    id: r[0],
-    date: r[1],
-    eraId: r[2],
-    title: r[3],
-    desc: r[4],
-    recommend: r[5] || 'salaryman',
-    icon: r[3].includes('💥') ? '💥' : (r[3].includes('🚨') ? '🚨' : (r[3].includes('📺') ? '📺' : '📍')),
+    id: getValue('id') || ('sc_' + Date.now()),
+    date: getValue('date') || '날짜 미상',
+    eraId: getValue('era') || '2026',
+    title: title || '제목 없음',
+    desc: getValue('desc') || '설명 없음',
+    recommend: getValue('rec') || 'salaryman',
+    icon: '📍',
     events: []
   };
 
+  // 아이콘 자동 선택
+  if (title.includes('💥')) s.icon = '💥';
+  else if (title.includes('🚨')) s.icon = '🚨';
+  else if (title.includes('📺')) s.icon = '📺';
+  else if (title.includes('📉')) s.icon = '📉';
+  else if (title.includes('💸')) s.icon = '💸';
+  else if (title.includes('⚾')) s.icon = '⚾';
+  else if (title.includes('✈️')) s.icon = '✈️';
+
   const event = {
-    time: r[6] || '09:00',
-    title: r[7] || '뉴스 속보',
+    time: getValue('time') || '09:00',
+    title: getValue('etitle') || '역사적 사건',
     type: 'scenario',
-    key: 'evt_' + (r[0] || Date.now()),
-    desc: (r[8] || '').split('|').map(line => ({ t: 'bad', m: line.trim() })),
+    key: 'evt_' + s.id,
+    desc: getValue('estory').split('|').map(line => ({ t: 'bad', m: line.trim() })),
     choices: []
   };
 
+  // 선택지 매핑 (Choice1_Text가 시작되는 인덱스 찾기)
+  const cStart = idx.estory + 1;
   for (let j = 0; j < 3; j++) {
-     const base = 9 + (j * 3);
-     if (r[base]) {
+     const b = cStart + (j * 3);
+     if (r[b]) {
        event.choices.push({
-         label: '▶ ' + r[base],
-         effect: parseEffect(r[base+1]),
-         result: [{ t:'story', m: r[base+2] || '...' }]
+         label: '▶ ' + r[b],
+         effect: parseEffect(r[b+1]),
+         result: [{ t:'story', m: r[b+2] || '...' }]
        });
      }
   }
