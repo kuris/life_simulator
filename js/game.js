@@ -1867,30 +1867,39 @@ function parseCSV(text) {
 }
 
 function mapCsvToScenarios(rows) {
-  if (rows.length < 2) return [];
+  if (rows.length < 2) {
+    console.warn('Scenarios: No data rows found.');
+    return [];
+  }
   const header = rows[0];
+  console.log('CSV Header:', header); // 브라우저 콘솔에서 확인용
+  
   const scenarios = [];
 
-  // 컬럼 인덱스 동적 찾기 (대소문자 무관)
-  const findIdx = (key) => header.findIndex(h => h.toLowerCase().includes(key.toLowerCase()));
-  const idx = {
-    id: findIdx('id'), 
-    date: findIdx('date'), 
-    era: findIdx('eraid'), 
-    title: findIdx('title'), 
-    desc: findIdx('desc'), 
-    rec: findIdx('recommend'),
-    time: findIdx('time'), 
-    etitle: findIdx('eventtitle'), 
-    estory: findIdx('eventstory')
+  const findIdx = (key, fallback) => {
+    const found = header.findIndex(h => h.toLowerCase().trim().includes(key.toLowerCase()));
+    return found !== -1 ? found : fallback;
   };
+
+  const idx = {
+    id: findIdx('id', 0), 
+    date: findIdx('date', 1), 
+    era: findIdx('eraid', 2), 
+    title: findIdx('title', 3), 
+    desc: findIdx('desc', 4), 
+    rec: findIdx('recommend', 5),
+    time: findIdx('time', 6), 
+    etitle: findIdx('eventtitle', 7), 
+    estory: findIdx('eventstory', 8)
+  };
+
+  console.log('Mapped Indices:', idx);
 
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     if (r.length < 3) continue;
 
     try {
-      // 비정상적으로 뭉친 데이터 대응 (개행 포함 시)
       if (r[0].includes('\n') && r.length < 5) {
         const subRows = parseCSV(r[0]);
         subRows.forEach(sr => {
@@ -1903,25 +1912,27 @@ function mapCsvToScenarios(rows) {
       const s = mapSingleScenario(r, idx);
       if (s) scenarios.push(s);
     } catch (err) {
-      console.warn('Row ' + i + ' mapping failed:', err);
+      console.error('Mapping error at row ' + i, err);
     }
   }
   return scenarios;
 }
 
 function mapSingleScenario(r, idx) {
-  if (!r || r.length < 5) return null;
+  if (!r) return null;
   
-  const getValue = (key) => (idx[key] !== -1 ? r[idx[key]] : '') || '';
+  const getValue = (pos) => (r[pos] !== undefined ? r[pos] : '').trim();
   
-  const title = getValue('title');
+  const title = getValue(idx.title);
+  if (!title && !getValue(idx.id)) return null; // 정말 비어있는 줄 패스
+
   const s = {
-    id: getValue('id') || ('sc_' + Date.now()),
-    date: getValue('date') || '날짜 미상',
-    eraId: getValue('era') || '2026',
+    id: getValue(idx.id) || ('sc_' + Math.random().toString(36).substr(2, 5)),
+    date: getValue(idx.date) || '날짜 미상',
+    eraId: getValue(idx.era) || '2026',
     title: title || '제목 없음',
-    desc: getValue('desc') || '설명 없음',
-    recommend: getValue('rec') || 'salaryman',
+    desc: getValue(idx.desc) || '설명 없음',
+    recommend: getValue(idx.rec) || 'salaryman',
     icon: '📍',
     events: []
   };
