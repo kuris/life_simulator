@@ -251,9 +251,23 @@ body::after {
   border-radius: 8px;
   padding: 14px 10px 12px;
   text-align: center;
-  cursor: default;
+  cursor: pointer;
   transition: border-color .2s, transform .15s, box-shadow .2s;
   overflow: hidden;
+}
+.title-era-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 6px 20px rgba(0,255,136,.18);
+}
+.title-quick-hint {
+  text-align: center;
+  font-size: 10px;
+  color: var(--accent);
+  letter-spacing: 1px;
+  margin: -12px 0 14px;
+  opacity: 0.7;
+  animation: blink 2s infinite;
 }
 .title-era-card::after {
   content: '';

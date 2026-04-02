@@ -276,13 +276,24 @@ function buildDayEvents(profile, era) {
     { label:'▶ 도시락 (절약!)', type:'money',
       effect:{ stress:-2, stamina:12 },
       result:[{ t:'good', m:'준비해온 도시락. 건강하고 경제적!' }] },
-    { label:'▶ 배달 시켜먹기 (-' + Math.round(econ.jajangmyeon*1.4).toLocaleString() + '원)', type:'normal',
-      effect:{ stress:-3, stamina:12, money:-Math.round(econ.jajangmyeon*1.4), time:40 },
-      result:[{ t:'story', m:'배달 주문 완료. -' + Math.round(econ.jajangmyeon*1.4).toLocaleString() + '원' }] },
     { label:'▶ 점심 건너뜀 (절약 + 다이어트)', type:'bad',
       effect:{ stress:5, stamina:-15 },
       result:[{ t:'bad', m:'배가 고프다... 오후에 집중이 안 될 것 같다.' }] },
   ];
+  // 배달 옵션: 시대별 분기
+  if (eraId === '2020' || eraId === '2026') {
+    lunchChoices.push({ label:'▶ 배달앱으로 시켜먹기 (-' + Math.round(econ.jajangmyeon*1.4).toLocaleString() + '원)', type:'normal',
+      effect:{ stress:-3, stamina:12, money:-Math.round(econ.jajangmyeon*1.4), time:40 },
+      result:[{ t:'story', m:'배달앱 클릭 한 번에 배달. -' + Math.round(econ.jajangmyeon*1.4).toLocaleString() + '원' }] });
+  } else if (eraId === '2010') {
+    lunchChoices.push({ label:'▶ 전화로 배달 시켜먹기 (-' + Math.round(econ.jajangmyeon*1.3).toLocaleString() + '원)', type:'normal',
+      effect:{ stress:-2, stamina:11, money:-Math.round(econ.jajangmyeon*1.3), time:40 },
+      result:[{ t:'story', m:'전화 배달. 배달앱은 아직 생소하다.' }] });
+  } else if (eraId === '1997' || eraId === '2000') {
+    lunchChoices.push({ label:'▶ 전화로 짜장면 배달 (-' + Math.round(econ.jajangmyeon*1.2).toLocaleString() + '원)', type:'normal',
+      effect:{ stress:-2, stamina:11, money:-Math.round(econ.jajangmyeon*1.2), time:40 },
+      result:[{ t:'story', m:'전화로 야... (5분 뒤) 배달직 아저씨가 온다!' }] });
+  }
   if (eraId==='1980') {
     lunchChoices.push({ label:'▶ 구내식당 정식 먹는다', type:'normal',
       effect:{ stamina:18, money:-econ.jajangmyeon, stress:-5, time:30 },
@@ -396,10 +407,21 @@ function buildDayEvents(profile, era) {
         result:[
           { t:'good', m:'시원한 맥주 한 잔. -' + Math.round(econ.jajangmyeon*3).toLocaleString() + '원' },
         ].concat(p.hasSpouse ? [{ t:'bad', m:'귀가가 늦어진다. 배우자가 걱정할 것 같다.' }] : []) },
-      { label:'▶ 당근마켓 직거래 (+30,000원)', type:'money',
-        effect:{ money:30000, time:commuteMin+20, stamina:-3 },
-        result:[{ t:'money', m:'당근 거래 완료! +30,000원' }] },
     ];
+    // 중고거래: 시대별 분기
+    if (eraId === '2020' || eraId === '2026') {
+      goHomeChoices.push({ label:'▶ 당근마켓 직거래 (+30,000원)', type:'money',
+        effect:{ money:30000, time:commuteMin+20, stamina:-3 },
+        result:[{ t:'money', m:'당근 거래 완료! +30,000원' }] });
+    } else if (eraId === '2010') {
+      goHomeChoices.push({ label:'▶ 중고나라 직거래 (+25,000원)', type:'money',
+        effect:{ money:25000, time:commuteMin+25, stamina:-3 },
+        result:[{ t:'money', m:'중고나라 거래 완료! +25,000원' }] });
+    } else if (eraId === '2000') {
+      goHomeChoices.push({ label:'▶ 네이버 카페 중고거래 (+20,000원)', type:'money',
+        effect:{ money:20000, time:commuteMin+25, stamina:-3 },
+        result:[{ t:'money', m:'인터넷 중고거래 완료! +20,000원' }] });
+    }
     if (eraId === '1997') {
       goHomeChoices.push({ label:'▶ 금 모으기 운동 참여 후 귀가', type:'history',
         effect:{ money:-50000, stress:-3, flag:'patriot', time:commuteMin+30 },
@@ -474,9 +496,9 @@ function buildDayEvents(profile, era) {
     { label:'▶ 일찍 잠든다 (숙면)', type:'normal',
       effect:{ stamina:25, stress:-8, flag:'earlyBed' },
       result:[{ t:'good', m:'현명한 선택. 내일을 위한 충전!' }] },
-    { label:'▶ 넷플릭스/유튜브 보다 잔다', type:'normal',
+    { label: eraId==='1980' ? '▶ TV 연속극 보다 잔다' : eraId==='1997' ? '▶ 비디오 빌려와서 보다 잔다' : eraId==='2000' ? '▶ PC로 영화/MP3 듣다 잔다' : '▶ 넷플릭스/유튜브 보다 잔다', type:'normal',
       effect:{ stress:-15, stamina:-5 },
-      result:[{ t:'story', m:'알고리즘에 빠져 어느새 새벽 1시다.' }] },
+      result:[{ t:'story', m: eraId==='1980' ? '주말의 명화... 밤이 깊어간다.' : eraId==='1997' ? '비디오 한 편. 현실을 잊었다.' : eraId==='2000' ? 'MP3 플레이어에 담아둔 음악이 흘러나온다.' : '알고리즘에 빠져 어느새 새벽 1시다.' }] },
     { label:'▶ 내일 걱정하며 뒤척인다', type:'bad',
       effect:{ stress:12, stamina:-8 },
       result:[{ t:'bad', m:'내일 회의, 돈 걱정... 잠이 안 온다.' }] },
@@ -546,14 +568,35 @@ function getMorningPool(p, e) {
     ]
   });
 
-  pool.push({
-    title:'📦 당근마켓 문의',
-    descLines: [{ t:'story', m:'중고 거래 문의가 왔다.' }],
-    choices:[
-      { label:'▶ 오늘 직거래 (+45,000원)', type:'money', effect:{ money:45000, time:20 }, result:[{ t:'money', m:'당근 거래 +45,000원!' }] },
-      { label:'▶ 내일로 미룬다', type:'normal', effect:{}, result:[{ t:'story', m:'내일 하기로 했다.' }] },
-    ]
-  });
+  // 중고거래 플랫폼: 시대별 분기
+  if (eraId === '2020' || eraId === '2026') {
+    pool.push({
+      title:'📦 당근마켓 문의',
+      descLines: [{ t:'story', m:'중고 거래 문의가 왔다.' }],
+      choices:[
+        { label:'▶ 오늘 직거래 (+45,000원)', type:'money', effect:{ money:45000, time:20 }, result:[{ t:'money', m:'당근 거래 +45,000원!' }] },
+        { label:'▶ 내일로 미룬다', type:'normal', effect:{}, result:[{ t:'story', m:'내일 하기로 했다.' }] },
+      ]
+    });
+  } else if (eraId === '2010') {
+    pool.push({
+      title:'💻 중고나라 직거래 문의',
+      descLines: [{ t:'story', m:'중고나라 쪽지가 왔다.' }],
+      choices:[
+        { label:'▶ 직거래 진행 (+35,000원)', type:'money', effect:{ money:35000, time:25 }, result:[{ t:'money', m:'중고나라 거래 +35,000원!' }] },
+        { label:'▶ 내일로 미룬다', type:'normal', effect:{}, result:[{ t:'story', m:'내일 하기로 했다.' }] },
+      ]
+    });
+  } else if (eraId === '2000') {
+    pool.push({
+      title:'💻 네이버 카페 중고거래',
+      descLines: [{ t:'story', m:'인터넷 카페에 올린 물건 문의가 왔다.' }],
+      choices:[
+        { label:'▶ 거래 진행 (+25,000원)', type:'money', effect:{ money:25000, time:30 }, result:[{ t:'money', m:'인터넷 중고거래 +25,000원!' }] },
+        { label:'▶ 거절한다', type:'normal', effect:{}, result:[{ t:'story', m:'다음에 하기로 했다.' }] },
+      ]
+    });
+  }
 
   pool.push({
     title:'☎️ 갑작스러운 보험 전화',

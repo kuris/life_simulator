@@ -483,6 +483,95 @@ function typeText(el, text, speed, initialDelay, callback, append) {
   setTimeout(tick, initialDelay || 0);
 }
 
+// ─── 퀵 스타트 (타이틀 카드 직접 클릭) ────────────────
+function quickStartEra(eraId) {
+  if (typeof SFX !== 'undefined') SFX.play('click');
+
+  // 랜덤 성별 배정
+  var gender = Math.random() < 0.5 ? 'male' : 'female';
+  P.gender = gender;
+  P.name   = gender === 'female' ? '김민지' : '김철수';
+  P.age    = null;
+
+  // 시대 찾기
+  var era = null;
+  for (var i = 0; i < ERAS.length; i++) {
+    if (ERAS[i].id === eraId) { era = ERAS[i]; break; }
+  }
+  if (!era) return;
+  G.era = era;
+  document.body.className = era.cssClass;
+
+  // 랜덤 고용 형태
+  var empTypes = ['fulltime', 'contract', 'freelance'];
+  var empId = empTypes[Math.floor(Math.random() * empTypes.length)];
+  var empObj = null;
+  for (var j = 0; j < EMPLOY_TYPES.length; j++) {
+    if (EMPLOY_TYPES[j].id === empId) { empObj = EMPLOY_TYPES[j]; break; }
+  }
+  if (!empObj) empObj = EMPLOY_TYPES[0];
+
+  // 랜덤 직업
+  var job = era.jobs[Math.floor(Math.random() * era.jobs.length)];
+
+  // 랜덤 거주지/회사
+  var companies = getCompanyList(era.id);
+  var company = companies[Math.floor(Math.random() * companies.length)];
+  var home    = era.homeLocations[Math.floor(Math.random() * era.homeLocations.length)];
+
+  // 결혼 여부 (30% 확률)
+  var hasSpouse = Math.random() < 0.3;
+  var hasKid    = hasSpouse && Math.random() < 0.4;
+
+  G.profile = {
+    gender: gender, name: P.name, age: null,
+    employType: empObj, job: job,
+    hasSpouse: hasSpouse, hasKid: hasKid,
+    company: company, home: home,
+    flags: [], rel_spouse: 60, rel_kid: 60
+  };
+
+  var baseIncome = (empObj.id === 'fulltime' || empObj.id === 'contract')
+    ? Math.round(job.dailyPay) : 0;
+  G.stats = { stress:0, stamina:100, mental:100, time:390, income:baseIncome, expense:0 };
+  G.chores = { done:[], pending:[] };
+  G.eventIdx = 0;
+  G.historicFired = false;
+  G.events = buildDayEvents(G.profile, G.era);
+
+  showScreen('game');
+  if (typeof SFX !== 'undefined') SFX.play('gameStart');
+  if (typeof BGM !== 'undefined') BGM.play(eraId);
+
+  var chip = document.getElementById('game-era-chip');
+  if (chip) {
+    chip.textContent = era.name;
+    chip.style.background = 'var(--primary)';
+    chip.style.color = 'var(--bg)';
+  }
+  var dateEl = document.getElementById('side-date');
+  if (dateEl) dateEl.textContent = era.name + ' 어느 날';
+  var priceEl = document.getElementById('s-era-price');
+  if (priceEl) priceEl.textContent = getPriceLabel(era.id);
+
+  setupFamilyPanel();
+  updateSide();
+  clearEl('game-log');
+  clearEl('game-choices');
+
+  var hpanel = document.getElementById('side-history');
+  if (hpanel) hpanel.style.display = 'none';
+
+  // 퀵스타트 안내 로그
+  var gIcon = gender === 'female' ? '👩' : '👨';
+  log('game-log', 'system', '[ ⚡ 빠른 시작 — ' + era.name + ' ]');
+  log('game-log', 'good', gIcon + ' ' + P.name + ' · ' + empObj.label + ' · ' + job.icon + ' ' + job.label);
+  log('game-log', 'system', '🏢 ' + company.label + ' | 🏠 ' + home.label);
+  log('game-log', 'divider', '');
+
+  setTimeout(nextEvent, 800);
+}
+
 function selectEra(eraId) {
   G.era = null;
   for (var i = 0; i < ERAS.length; i++) {
@@ -737,6 +826,7 @@ function initGame() {
 
   showScreen('game');
   if (typeof SFX !== 'undefined') SFX.play('gameStart');
+  if (typeof BGM !== 'undefined') BGM.play(G.era.id);
 
   var chip = document.getElementById('game-era-chip');
   if (chip) {
@@ -1092,6 +1182,7 @@ function handleSpecial(type) {
 // ─── 엔딩 ─────────────────────────────────────────
 function showEnding() {
   showScreen('ending');
+  if (typeof BGM !== 'undefined') BGM.stop();
   if (typeof SFX !== 'undefined') setTimeout(function(){ SFX.play('ending'); }, 300);
   clearEl('ending-log');
 
@@ -1282,6 +1373,7 @@ function getGrade(score) {
 
 // ─── 리셋 ─────────────────────────────────────────
 function resetGame() {
+  if (typeof BGM !== 'undefined') BGM.stop();
   P.gender = null;
   P.age    = null;
   P.name   = '';
